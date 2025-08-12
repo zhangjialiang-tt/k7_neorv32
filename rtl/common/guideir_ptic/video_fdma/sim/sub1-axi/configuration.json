@@ -1,0 +1,37 @@
+{
+    "tb": {
+        "tb_mode": "image",
+        "path": "./",
+        "name": "tb.v",
+        "width": "640",
+        "height": "512",
+        "frame_rate": "50",
+        "pixel_clock": "19",
+        "sim_data_path": "../output/",
+        "sim_data_name": "ghe_in.txt"
+    },
+    "modelsim": {
+        "post_sim_data_path": "../output/",
+        "post_sim_data_name": "modelsim_22.raw",
+        "post_image_mode": "y8"
+    },
+    "image": {
+        "path": "../data/",
+        "name": "ide_in.raw",
+        "image_number": "1",
+        "image_mode": "y16",
+        "width": "640",
+        "height": "512"
+    },
+    "compare": {
+        "compare_mode": "raw",
+        "exe_path": "../../tools/",
+        "exe_name": "sure_let.exe",
+        "temp_path": "../output/",
+        "compare_source_path": "../data/",
+        "compare_source_name": "vs_22.raw",
+        "image_mode": "y8",
+        "width": "640",
+        "height": "512"
+    }
+}

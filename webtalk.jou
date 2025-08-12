@@ -1,0 +1,12 @@
+#-----------------------------------------------------------
+# Webtalk v2021.1 (64-bit)
+# SW Build 3247384 on Thu Jun 10 19:36:33 MDT 2021
+# IP Build 3246043 on Fri Jun 11 00:30:35 MDT 2021
+# Start of session at: Tue Aug 12 19:11:57 2025
+# Process ID: 21808
+# Current directory: C:/100-Working/105-Working-improvement/github_lib/k7_neorv32
+# Command line: wbtcv.exe -mode batch -source C:/100-Working/105-Working-improvement/github_lib/k7_neorv32/.Xil/Vivado-24844-beelink-ser6/webtalk/labtool_webtalk.tcl -notrace
+# Log file: C:/100-Working/105-Working-improvement/github_lib/k7_neorv32/webtalk.log
+# Journal file: C:/100-Working/105-Working-improvement/github_lib/k7_neorv32\webtalk.jou
+#-----------------------------------------------------------
+source C:/100-Working/105-Working-improvement/github_lib/k7_neorv32/.Xil/Vivado-24844-beelink-ser6/webtalk/labtool_webtalk.tcl -notrace

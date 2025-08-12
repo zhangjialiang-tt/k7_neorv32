@@ -1,0 +1,2 @@
+`define BLOCK_DESIGN_DDR_ALONE
+// `define USE_CAMERA

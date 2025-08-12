@@ -1,0 +1,20 @@
+#-----------------------------------------------------------
+# Vivado v2021.1 (64-bit)
+# SW Build 3247384 on Thu Jun 10 19:36:33 MDT 2021
+# IP Build 3246043 on Fri Jun 11 00:30:35 MDT 2021
+# Start of session at: Tue Aug 12 19:00:26 2025
+# Process ID: 5192
+# Current directory: C:/100-Working/105-Working-improvement/github_lib/k7_neorv32/k7_dma/k7_dma.runs/design_1_s03_data_fifo_0_synth_1
+# Command line: vivado.exe -log design_1_s03_data_fifo_0.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source design_1_s03_data_fifo_0.tcl
+# Log file: C:/100-Working/105-Working-improvement/github_lib/k7_neorv32/k7_dma/k7_dma.runs/design_1_s03_data_fifo_0_synth_1/design_1_s03_data_fifo_0.vds
+# Journal file: C:/100-Working/105-Working-improvement/github_lib/k7_neorv32/k7_dma/k7_dma.runs/design_1_s03_data_fifo_0_synth_1\vivado.jou
+#-----------------------------------------------------------
+Sourcing tcl script 'C:/Users/zhangjl/AppData/Roaming/Xilinx/Vivado/Vivado_init.tcl'
+source design_1_s03_data_fifo_0.tcl -notrace
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1700] Loaded user IP repository 'c:/100-Working/105-Working-improvement/github_lib/k7_neorv32/ip/uisrc'.
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository 'C:/Software/Xilinx/Vivado/2021.1/data/ip'.
+WARNING: [IP_Flow 19-4995] The host OS only allows 260 characters in a normal path. The IP cache path is more than 80 characters. If you experience issues with IP caching, please consider changing the IP cache to a location with a shorter path. Alternately consider using the OS subst command to map part of the path to a drive letter. 
+Current IP cache path is c:/100-Working/105-Working-improvement/github_lib/k7_neorv32/k7_dma/k7_dma.cache/ip 
+INFO: [IP_Flow 19-4838] Using cached IP synthesis design for IP design_1_s03_data_fifo_0, cache-ID = 48e930c141f0e5c3.
+INFO: [Common 17-206] Exiting Vivado at Tue Aug 12 19:00:34 2025...

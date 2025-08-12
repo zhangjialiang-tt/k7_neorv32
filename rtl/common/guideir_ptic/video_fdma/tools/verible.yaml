@@ -1,0 +1,10 @@
++enum-name-style
++line-length=length:200
++explicit-parameter-storage-type
++explicit-function-lifetime
++explicit-task-lifetime
++parameter-name-style
++always-comb
++no-trailing-spaces
++no-tabs
++generate-label-prefix

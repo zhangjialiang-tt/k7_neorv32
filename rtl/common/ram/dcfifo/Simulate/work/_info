@@ -1,0 +1,157 @@
+m255
+K4
+z2
+!s11f vlog 2020.4 2020.10, Oct 13 2020
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+Z0 dC:/100-Working/102-Working-Prj/Embedded_Group_Repositories/BasicModule/Efinity_basic_lib/ip/ram/dcfifo/Simulate
+vDC_FIFO
+Z1 !s110 1695116591
+!i10b 1
+!s100 [G^a`>:j;7l7IDLI5aeKo3
+Z2 !s11b Dg1SIo80bB@j0V0VzS_@n1
+I`U?CcSP4AJXZO[9UeTRD83
+R0
+Z3 w1690443570
+Z4 8../Source/DC_FIFO.v
+Z5 F../Source/DC_FIFO.v
+!i122 0
+L0 111 403
+Z6 VDg1SIo80bB@j0V0VzS_@n1
+Z7 OL;L;2020.4;71
+r1
+!s85 0
+31
+Z8 !s108 1695116591.000000
+Z9 !s107 ../Source/DC_FIFO.v|Test_DC_FIFO.v|TestBench.v|
+Z10 !s90 -reportprogress|300|-f|Sourcelist.f|
+!i113 0
+Z11 tCvgOpt 0
+n@d@c_@f@i@f@o
+vFifoAddrCnt
+R1
+!i10b 1
+!s100 2d7aHU<>R_M9kO@O]?[Ha2
+R2
+IgWc[XfM07SdVGSdalk7gd1
+R0
+R3
+R4
+R5
+!i122 0
+L0 536 69
+R6
+R7
+r1
+!s85 0
+31
+R8
+R9
+R10
+!i113 0
+R11
+n@fifo@addr@cnt
+vGrayCnt
+R1
+!i10b 1
+!s100 HVoaMK:22c4oSRMLifh[32
+R2
+I368TebFcWBImD2=]Ma9CA0
+R0
+R3
+R4
+R5
+!i122 0
+L0 628 82
+R6
+R7
+r1
+!s85 0
+31
+R8
+R9
+R10
+!i113 0
+R11
+n@gray@cnt
+vGrayDecode
+R1
+!i10b 1
+!s100 UX6S]bm:g^U6zmo`a9aX21
+R2
+I]bgfA1ILBAGL[Kfh2QN?93
+R0
+R3
+R4
+R5
+!i122 0
+L0 732 31
+R6
+R7
+r1
+!s85 0
+31
+R8
+R9
+R10
+!i113 0
+R11
+n@gray@decode
+vTest_DC_FIFO
+R1
+!i10b 1
+!s100 P3a?GgaP4Z=8hm:hBj=FT1
+R2
+I5hIifY57VM7n@oO;LoEzg0
+R0
+R3
+8Test_DC_FIFO.v
+FTest_DC_FIFO.v
+!i122 0
+L0 4 654
+R6
+R7
+r1
+!s85 0
+31
+R8
+R9
+R10
+!i113 0
+R11
+n@test_@d@c_@f@i@f@o
+vTestBench
+R1
+!i10b 1
+!s100 CTcZ9cld3JER>EPG9lY8U1
+R2
+InAX>OHBclDWNOjR:z@?^D2
+R0
+R3
+8TestBench.v
+FTestBench.v
+!i122 0
+L0 1 5
+R6
+R7
+r1
+!s85 0
+31
+R8
+R9
+R10
+!i113 0
+R11
+n@test@bench
+TTestBench_opt
+R1
+V@;975L>1:V`7fam2obhAR3
+04 9 4 work TestBench fast 0
+o+acc=npr
+R11
+n@test@bench_opt
+OL;O;2020.4;71
