@@ -64,7 +64,8 @@ NEORV32_SRC_PATH = $(NEORV32_HOME)/sw/lib/source
 # Path to NEORV32 executable generator
 NEORV32_EXG_PATH = $(NEORV32_HOME)/sw/image_gen
 # Path to NEORV32 rtl folder
-NEORV32_RTL_PATH = $(NEORV32_HOME)/rtl
+# NEORV32_RTL_PATH = $(NEORV32_HOME)/rtl
+NEORV32_RTL_PATH = $(NEORV32_HOME)/ip/neorv32
 # Path to NEORV32 sim folder
 NEORV32_SIM_PATH = $(NEORV32_HOME)/sim
 

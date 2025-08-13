@@ -291,12 +291,31 @@ clean:
 	@echo "INFO: Clean finished."
 
 unpack:
-	rm -rf .git 
+	rm -rf .git
+ifeq ($(OS_NAME),Linux)
+	tar -xzf git.tar.gz
+	tar -xf git.tar
+else
 	7z x -y git.tar.gz
 	7z x -y git.tar
+endif
 	rm git.tar.gz git.tar
+
 pack:
 	python git_changed_files.py --package --all-files
+
+# Pack .git folder
+pack_git:
+ifeq ($(OS_NAME),Linux)
+	tar -czf git_folder.tar.gz .git
+	tar -cf git_folder.tar .git
+else
+# 	7z a -tzip git_folder.zip .git
+	7z a -ttar git.tar .git
+	7z a -tgzip git.tar.gz git.tar
+	rm git.tar
+endif
+
 
 # Help target
 help:
