@@ -95,6 +95,56 @@ add_files -fileset sources_1 -norecurse [list \
  [file normalize "${origin_dir}/rtl/uivtc/rect.v"] \
  [file normalize "${origin_dir}/rtl/uivtc/uivtc.v"] \
  [file normalize "${origin_dir}/rtl/uitpg/uitpg.v"] \
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_package.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_application_image.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_bootloader_image.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_boot_rom.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_bus.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cache.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cfs.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_clint.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_fifo.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_decompressor.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_frontend.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_control.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_hwtrig.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_counters.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_regfile.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_shifter.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_muldiv.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_bitmanip.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_fpu.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_cfu.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_cond.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_cp_crypto.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_alu.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_lsu.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu_pmp.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_cpu.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_debug_auth.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_debug_dm.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_debug_dtm.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_dma.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_dmem.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_gpio.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_gptmr.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_imem.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_neoled.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_onewire.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_pwm.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_sdi.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_slink.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_spi.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_sys.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_sysinfo.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_xbus.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_wdt.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_uart.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_twi.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_twd.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_trng.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_tracer.vhd"]\
+ [file normalize "${origin_dir}/ip/neorv32/core/neorv32_top.vhd"]\
 ]
 # Define the list of custom XCI files to be added
 # 注意这里列表直接包含的是XCI文件的路径，而不是整个IP目录
@@ -131,6 +181,305 @@ foreach xci_path $custom_xci_files {
     }
 }
 
+set file "$origin_dir/ip/neorv32/core/neorv32_package.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_application_image.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_bootloader_image.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_boot_rom.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_bus.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cache.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cfs.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_clint.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_fifo.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_decompressor.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_frontend.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_control.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_hwtrig.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_counters.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_regfile.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_shifter.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_muldiv.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_bitmanip.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_fpu.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_cfu.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_cond.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_cp_crypto.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_alu.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_lsu.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu_pmp.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_cpu.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_debug_auth.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_debug_dm.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_debug_dtm.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_dma.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_dmem.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_gpio.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_gptmr.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_imem.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_neoled.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_onewire.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_pwm.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_sdi.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_slink.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_spi.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_sys.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_sysinfo.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_xbus.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_wdt.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_uart.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_twi.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_twd.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_trng.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_tracer.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
+
+set file "$origin_dir/ip/neorv32/core/neorv32_top.vhd"
+set file [file normalize $file]
+set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+set_property -name "file_type" -value "VHDL" -objects $file_obj
+set_property -name "library" -value "neorv32" -objects $file_obj
 # Add MIG project files if needed (usually handled by XCI)
 add_files -fileset sources_1 -norecurse [list \
  [file normalize "${origin_dir}/ip/design_1_mig_7series_0_0/mig_b.prj" ]\

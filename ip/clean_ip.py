@@ -12,6 +12,10 @@ for root, dirs, files in os.walk(script_dir):
     if 'uisrc' in dirs:
         dirs.remove('uisrc')
         
+    # 跳过neorv32目录
+    if 'neorv32' in dirs:
+        dirs.remove('neorv32')
+        
     for filename in files:
         file_path = os.path.join(root, filename)
 

@@ -441,54 +441,54 @@ module top #(
         .i_Cmd_2        (cmd_scaler_down),
         .o_Cmd_scaler   (scaler_multiple)
     );
-    led_blink #(
-        .LED_NUM (1),
-        .STS_FREQ(200_000_000)
-    ) led1_blink_inst (
-        .i_Sys_clk(clk_200m_int),
-        .i_Rst_n  (~rst_200m_int),
-        .o_led    (o_led[0])
-    );
-    led_blink #(
-        .LED_NUM (1),
-        .STS_FREQ(100_000_000)
-    ) led2_blink_inst (
-        .i_Sys_clk(clk_100m_int),
-        .i_Rst_n  (~rst_100m_int),
-        .o_led    (o_led[1])
-    );
-    led_blink #(
-        .LED_NUM (1),
-        .STS_FREQ(40_000_000)
-    ) led3_blink_inst (
-        .i_Sys_clk(clk_40m_int),
-        .i_Rst_n  (~rst_40m_int),
-        .o_led    (o_led[2])
-    );
-    led_blink #(
-        .LED_NUM (1),
-        .STS_FREQ(100_000_000)
-    ) led4_blink_inst (
-        .i_Sys_clk(axi_clk),
-        .i_Rst_n  (~axi_rst),
-        .o_led    (o_led[3])
-    );
-    led_blink #(
-        .LED_NUM (1),
-        .STS_FREQ(50_000_000)
-    ) led5_blink_inst (
-        .i_Sys_clk(clk_50m_int),
-        .i_Rst_n  (~rst_50m_int),
-        .o_led    (o_led[4])
-    );
-    led_blink #(
-        .LED_NUM (1),
-        .STS_FREQ(20_000_000)
-    ) led6_blink_inst (
-        .i_Sys_clk(clk_20m_int),
-        .i_Rst_n  (~rst_20m_int),
-        .o_led    (o_led[5])
-    );
+    // led_blink #(
+    //     .LED_NUM (1),
+    //     .STS_FREQ(200_000_000)
+    // ) led1_blink_inst (
+    //     .i_Sys_clk(clk_200m_int),
+    //     .i_Rst_n  (~rst_200m_int),
+    //     .o_led    (o_led[0])
+    // );
+    // led_blink #(
+    //     .LED_NUM (1),
+    //     .STS_FREQ(100_000_000)
+    // ) led2_blink_inst (
+    //     .i_Sys_clk(clk_100m_int),
+    //     .i_Rst_n  (~rst_100m_int),
+    //     .o_led    (o_led[1])
+    // );
+    // led_blink #(
+    //     .LED_NUM (1),
+    //     .STS_FREQ(40_000_000)
+    // ) led3_blink_inst (
+    //     .i_Sys_clk(clk_40m_int),
+    //     .i_Rst_n  (~rst_40m_int),
+    //     .o_led    (o_led[2])
+    // );
+    // led_blink #(
+    //     .LED_NUM (1),
+    //     .STS_FREQ(100_000_000)
+    // ) led4_blink_inst (
+    //     .i_Sys_clk(axi_clk),
+    //     .i_Rst_n  (~axi_rst),
+    //     .o_led    (o_led[3])
+    // );
+    // led_blink #(
+    //     .LED_NUM (1),
+    //     .STS_FREQ(50_000_000)
+    // ) led5_blink_inst (
+    //     .i_Sys_clk(clk_50m_int),
+    //     .i_Rst_n  (~rst_50m_int),
+    //     .o_led    (o_led[4])
+    // );
+    // led_blink #(
+    //     .LED_NUM (1),
+    //     .STS_FREQ(20_000_000)
+    // ) led6_blink_inst (
+    //     .i_Sys_clk(clk_20m_int),
+    //     .i_Rst_n  (~rst_20m_int),
+    //     .o_led    (o_led[5])
+    // );
     // assign o_led[4] = ddr_init_done;
     // assign o_led[5] = ~ddr_init_done;
     //**********************************************************************************************
@@ -926,6 +926,27 @@ module top #(
         .S03_AXI_0_wready (S03_AXI_0_wready),
         .S03_AXI_0_wstrb  (S03_AXI_0_wstrb),
         .S03_AXI_0_wvalid (S03_AXI_0_wvalid)
+    );
+
+    neorv32_top #(
+        .CLOCK_FREQUENCY(100_000_000),
+        .BOOT_MODE_SELECT(0),
+        .RISCV_ISA_C(1'b1),
+        .RISCV_ISA_M(1'b1),
+        .RISCV_ISA_Zicntr(1'b1),
+        .IMEM_EN(1'b1),
+        .IMEM_SIZE(16 * 1024),
+        .DMEM_EN(1'b1),
+        .DMEM_SIZE(8 * 1024),
+        .IO_GPIO_NUM(8),
+        .IO_CLINT_EN(1'b1),
+        .IO_UART0_EN(1'b1)
+    ) neorv32_top_inst (
+        .clk_i      (clk_100m_int),
+        .rstn_i     (~rst_100m_int),
+        .gpio_o     (o_led),
+        .uart0_txd_o(system_uart_debug_txd),
+        .uart0_rxd_i(system_uart_debug_rxd)
     );
 `else
     design_1_wrapper design_1_wrapper_inst (
