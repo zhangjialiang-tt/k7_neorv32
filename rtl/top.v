@@ -27,6 +27,7 @@ module top #(
     output wire [  2:0] o_TMDS1_P,
     output wire [  2:0] o_TMDS1_N,
     output wire         o_TMDS1_en,
+`ifdef MICROBLAZE
     inout       [ 31:0] ddr3_dq,                //ddr3 data
     inout       [  3:0] ddr3_dqs_n,             //ddr3 dqs negative
     inout       [  3:0] ddr3_dqs_p,             //ddr3 dqs positive
@@ -42,6 +43,7 @@ module top #(
     output      [  0:0] ddr3_cs_n,              //ddr3 chip select,
     output      [  3:0] ddr3_dm,                //ddr3_dm
     output      [  0:0] ddr3_odt,               //ddr3_odt
+`endif
     inout  wire         system_spi_0_io0_io,
     inout  wire         system_spi_0_io1_io,
     inout  wire         system_spi_0_io2_io,
@@ -540,16 +542,29 @@ module top #(
     (*mark_debug = "false"*)wire [         1        - 1 : 0] buffer8_data_vs;
     (*mark_debug = "false"*)wire [         1        - 1 : 0] buffer8_data_valid;
     (*mark_debug = "false"*)wire [DATA_WIDTH        - 1 : 0] buffer8_data;
-    //==============================================================================
-    // DVP AXI Arbiter Instance - Auto Generated
-    //==============================================================================
-    // Configuration:
-    //   - Write Channels: 8
-    //   - Read Channels:  8
-    //   - Instance Name:  dvp_axi_arbiter_inst
-    //   - Generated from: dvp_arbiter_config.json
-    //==============================================================================
-
+    //**********************************************************************************************
+`ifdef NEORV32
+    neorv32_top #(
+        .CLOCK_FREQUENCY(100_000_000),
+        .BOOT_MODE_SELECT(0),
+        .RISCV_ISA_C(1'b1),
+        .RISCV_ISA_M(1'b1),
+        .RISCV_ISA_Zicntr(1'b1),
+        .IMEM_EN(1'b1),
+        .IMEM_SIZE(16 * 1024),
+        .DMEM_EN(1'b1),
+        .DMEM_SIZE(8 * 1024),
+        .IO_GPIO_NUM(8),
+        .IO_CLINT_EN(1'b1),
+        .IO_UART0_EN(1'b1)
+    ) neorv32_top_inst (
+        .clk_i      (clk_100m_int),
+        .rstn_i     (~rst_100m_int),
+        .gpio_o     (o_led),
+        .uart0_txd_o(system_uart_debug_txd),
+        .uart0_rxd_i(system_uart_debug_rxd)
+    );
+`endif
     //**********************************************************************************************
 `ifdef BLOCK_DESIGN_DDR_ALONE
     axi_video_bridge #(
@@ -928,27 +943,8 @@ module top #(
         .S03_AXI_0_wvalid (S03_AXI_0_wvalid)
     );
 
-    neorv32_top #(
-        .CLOCK_FREQUENCY(100_000_000),
-        .BOOT_MODE_SELECT(0),
-        .RISCV_ISA_C(1'b1),
-        .RISCV_ISA_M(1'b1),
-        .RISCV_ISA_Zicntr(1'b1),
-        .IMEM_EN(1'b1),
-        .IMEM_SIZE(16 * 1024),
-        .DMEM_EN(1'b1),
-        .DMEM_SIZE(8 * 1024),
-        .IO_GPIO_NUM(8),
-        .IO_CLINT_EN(1'b1),
-        .IO_UART0_EN(1'b1)
-    ) neorv32_top_inst (
-        .clk_i      (clk_100m_int),
-        .rstn_i     (~rst_100m_int),
-        .gpio_o     (o_led),
-        .uart0_txd_o(system_uart_debug_txd),
-        .uart0_rxd_i(system_uart_debug_rxd)
-    );
-`else
+`endif
+`ifdef MICROBLAZE
     design_1_wrapper design_1_wrapper_inst (
         .clk_flash           (clk_50m_int),
         .clk_soc             (clk_100m_int),
@@ -1118,10 +1114,13 @@ module top #(
     assign tpg_video_vs   = video_vs;
     assign tpg_video_hs   = video_hs;
     assign tpg_video_de   = video_de;
+`ifdef NEORV32
+    assign tpg_video_data = video_de ? (ch0_wr_de ? {ch0_wr_data[7:0], ch0_wr_data[7:0], ch0_wr_data[7:0]} : {8'd255, 8'd255, 8'd255}) : 0;
+`else
     // assign tpg_video_data = video_de ? (buffer1_data_valid ? {buffer1_data[7:0], buffer1_data[7:0], buffer1_data[7:0]} : {8'd255, 8'd255, 8'd255}) : 0;
     // assign tpg_video_data = video_de ? (buffer2_data_valid ? {buffer2_data[7:0], buffer2_data[7:0], buffer2_data[7:0]} : {8'd255, 8'd255, 8'd255}) : 0;
     assign tpg_video_data = video_de ? (buffer3_data_valid ? {buffer3_data[7:0], buffer3_data[7:0], buffer3_data[7:0]} : {8'd255, 8'd255, 8'd255}) : 0;
-    // assign tpg_video_data = video_de ? (ch0_wr_de ? {ch0_wr_data[7:0], ch0_wr_data[7:0], ch0_wr_data[7:0]} : {8'd255, 8'd255, 8'd255}) : 0;
+`endif
     uihdmitx_1 u_hdmi_tx (
         .RSTn_i(~rst_hdmi),
         .VS_i  (tpg_video_vs),

@@ -31,3 +31,7 @@ ov5640/
 ip/uisrc/uidelay/
 ip/uisrc/uiSensorRGB565/
 *.tar.gz
+image_gen/
+build/
+*.elf
+*.bin
