@@ -8,9 +8,11 @@
 # k7_base corresponds to Little Panda development board
 # mlk_base corresponds to Mi Lian Ke development board (not implemented)
 #! Note: Do not add spaces after variable names
-PROJECT_NAME ?= k7_neorv32#mlk_k7_base
+PROJECT_NAME ?= k7_neorv32
 # Vivado Part
 PART_NAME ?= xc7k325tffg900-2#xc7k325tffg676-2#xc7a200tfbg900-2
+REAL_PART_NAME := xc7k325tffg900-2#$(firstword $(subst #, ,$(PART_NAME)))
+DEBUG ?= xc7k325tffg676-2
 BLOCK_DESIGN_NAME ?= design_1
 # Vivado Executable (adjust if necessary)
 VIVADO := vivado
@@ -18,8 +20,18 @@ VIVADO := vivado
 # Directories
 SCRIPT_DIR := ./tcl
 PROJECT_DIR := ./${PROJECT_NAME}
+
+# --- Select TCL scripts based on PART_NAME ---
+ifeq ($(DEBUG),xc7k325tffg900-2)
+	BUILD_BD_TCL := ${SCRIPT_DIR}/build_bd_ddr_standalone.tcl
+else
+	ifeq ($(REAL_PART_NAME),xc7k325tffg676-2)
+		BUILD_BD_TCL := ${SCRIPT_DIR}/build_bd_base.tcl
+	else
+		BUILD_BD_TCL := ${SCRIPT_DIR}/build_bd_mlk.tcl
+	endif
+endif
 BUILD_PRJ_TCL := ${SCRIPT_DIR}/build_prj.tcl
-BUILD_BD_TCL := ${SCRIPT_DIR}/build_bd.tcl
 MMI_TCL := ${SCRIPT_DIR}/run_mmi.tcl
 PROGRAM_MCS_TCL := ${SCRIPT_DIR}/program_mcs.tcl
 
@@ -98,8 +110,8 @@ all: bitstream
 build_hw: ${PROJECT_DIR}/${PROJECT_NAME}.xpr
 
 ${PROJECT_DIR}/${PROJECT_NAME}.xpr:
-	@echo "INFO: Creating Vivado project '${PROJECT_NAME}' with part '${PART_NAME}'..."
-	${VIVADO} -mode batch -source ${BUILD_PRJ_TCL} -tclargs ${PROJECT_NAME} ${PART_NAME} ${BLOCK_DESIGN_NAME}
+	@echo "INFO: Creating Vivado project '${PROJECT_NAME}' with part '${REAL_PART_NAME}'..."
+	${VIVADO} -mode batch -source ${BUILD_PRJ_TCL} -tclargs ${PROJECT_NAME} ${REAL_PART_NAME} ${BLOCK_DESIGN_NAME} ${BUILD_BD_TCL}
 	@echo "INFO: Project creation script finished."
 
 # Run Synthesis

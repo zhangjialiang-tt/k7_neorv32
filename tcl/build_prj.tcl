@@ -1,17 +1,19 @@
-# Script arguments: project_name part_name
-if {$argc < 3} {
+# Script arguments: project_name part_name block_design_name bd_tcl_script
+if {$argc < 4} {
   puts "ERROR: Incorrect number of arguments."
-  puts "Usage: vivado -mode batch -source build_prj.tcl -tclargs <project_name> <part_name>"
+  puts "Usage: vivado -mode batch -source build_prj.tcl -tclargs <project_name> <part_name> <block_design_name> <bd_tcl_script>"
   exit 1
 }
 
 set _xil_proj_name_ [lindex $argv 0]
 set _xil_part_name_ [lindex $argv 1]
 set _xil_bd_name_ [lindex $argv 2]
+set _xil_bd_tcl_script_ [lindex $argv 3]
 
 puts "INFO: Project Name from Makefile: ${_xil_proj_name_}"
 puts "INFO: Part Name from Makefile: ${_xil_part_name_}"
 puts "INFO: Block Design Name from Makefile: ${_xil_bd_name_}"
+puts "INFO: Block Design Script from Makefile: ${_xil_bd_tcl_script_}"
 
 # Set the reference directory for source file relative paths (by default the value is script directory path)
 set origin_dir "."
@@ -546,27 +548,11 @@ set obj [get_filesets utils_1]
 # Adding sources referenced in BDs, if not already added
 
 
-# Source the build_bd.tcl script. It will use variables already set in this script's scope.
-puts "INFO: Sourcing build_bd.tcl. Expecting it to use _xil_bd_name_ ('${_xil_bd_name_}') and _xil_part_name_ ('${_xil_part_name_}') from this scope."
+# Source the build_bd.tcl script passed from Makefile.
+puts "INFO: Sourcing Block Design Tcl script: ${_xil_bd_tcl_script_}"
 
-# 根据工程名选择不同的tcl脚本
-# set bd_tcl_script "tcl/build_bd.tcl"
-set bd_tcl_script "tcl/build_bd_ddr_standalone.tcl"
-# if {${_xil_proj_name_} eq "k7_base"} {
-#   set bd_tcl_script "tcl/build_bd.tcl"
-# } elseif {${_xil_proj_name_} eq "a200_base"} {
-#   set bd_tcl_script "tcl/build_bd_a200.tcl"
-# } elseif {${_xil_proj_name_} eq "mlk_k7_base"} {
-#   set bd_tcl_script "tcl/build_bd_mlk.tcl"
-# } elseif {${_xil_proj_name_} eq "PTRW022"} {
-#   set bd_tcl_script "tcl/build_bd_PTRW022.tcl"
-# } else {
-#   puts "ERROR: Unknown project name: ${_xil_proj_name_}, cannot select corresponding BD script."
-#   exit 1
-# }
-
-if {[catch {source $bd_tcl_script} result]} {
-  puts "ERROR: Failed to source $bd_tcl_script: $result"
+if {[catch {source ${_xil_bd_tcl_script_}} result]} {
+  puts "ERROR: Failed to source ${_xil_bd_tcl_script_}: $result"
   exit 1
 }
 

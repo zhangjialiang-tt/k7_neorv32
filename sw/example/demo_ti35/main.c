@@ -9,7 +9,7 @@
 
 /**********************************************************************//**
  * @file demo_twi/main.c
- * @brief TWI AT24C04 EEPROM test program with diagnostics.
+ * @brief TWI AT24C04 EEPROM test program with integrated GPIO interrupt handling.
  **************************************************************************/
 
 #include <neorv32.h>
@@ -25,7 +25,14 @@
 /** I2C device address of the AT24C04 EEPROM.
  * This assumes the address pins A1 and A2 are grounded. */
 #define EEPROM_DEVICE_ADDR 0b1010000
+/** GPIO pin for interrupt */
+#define GPIO_IRQ_PIN 1
 /**@}*/
+
+
+// Globals for GPIO interrupt
+volatile uint32_t timestamp;
+volatile uint32_t gpio_irq_fired;
 
 
 // Prototypes
@@ -33,6 +40,8 @@ void bus_scan(void);
 int eeprom_write_byte(uint16_t address, uint8_t data);
 int eeprom_read_byte(uint16_t address, uint8_t *data);
 void print_hex_byte(uint8_t data);
+void gpio_interrupt_handler(void);
+static void puth(uint32_t num);
 
 
 /**********************************************************************//**
@@ -43,12 +52,29 @@ void print_hex_byte(uint8_t data);
 void delay_ms(uint32_t time_ms) {
   neorv32_aux_delay_ms(neorv32_sysinfo_get_clk(), time_ms);
 }
+
+
 /**********************************************************************//**
- * This program tests writing and reading a byte from an AT24C04 EEPROM.
- *
- * @note This program requires the UART and TWI to be synthesized.
- *
- * @return 0 if execution was successful
+ * GPIO interrupt handler from temp.c
+ **************************************************************************/
+void gpio_interrupt_handler(void) {
+  neorv32_uart0_printf(" ns\n----------------------------------------\n");
+  neorv32_gpio_irq_clr(1 << GPIO_IRQ_PIN); // clear only the specific pin's IRQ flag
+  uint32_t current = (uint32_t)neorv32_clint_time_get();
+  uint32_t delta = current - timestamp;
+  
+  neorv32_uart0_printf("\n--- GPIO INTERRUPT (pin %d, rising edge) ---\n", GPIO_IRQ_PIN);
+  neorv32_uart0_printf("Time since last interrupt: ");
+  puth(delta);
+  neorv32_uart0_printf(" ns\n----------------------------------------\n");
+
+  timestamp = current;
+  gpio_irq_fired = 1; // set flag for main loop
+}
+
+
+/**********************************************************************//**
+ * Main function.
  **************************************************************************/
 int main() {
 
@@ -60,25 +86,56 @@ int main() {
     return 1;
   }
 
+  // clear GPIO output (set all bits to 0)
+  neorv32_gpio_port_set(0);
   // setup UART at default baud rate, no interrupts
   neorv32_uart0_setup(BAUD_RATE, 0);
 
-  // check if TWI unit is implemented at all
-  if (neorv32_twi_available() == 0) {
-    neorv32_uart0_printf("ERROR! TWI controller not available!");
+  // intro
+  neorv32_uart0_printf("\n--- TWI AT24C04 EEPROM Test with GPIO Interrupt ---\n\n");
+
+  // ----------------------------------------------------------
+  // GPIO Interrupt Setup (Ported from temp.c)
+  // ----------------------------------------------------------
+  neorv32_uart0_printf("Setting up GPIO interrupt on pin %d (rising edge)...", GPIO_IRQ_PIN);
+
+  // check if GPIO unit is implemented
+  if (neorv32_gpio_available() == 0) {
+    neorv32_uart0_printf("ERROR! GPIO controller not available!\n");
     return 1;
   }
 
-  // intro
-  neorv32_uart0_printf("\n--- TWI AT24C04 EEPROM Test with Diagnostics ---\n\n");
+  // Install our GPIO interrupt handler
+  neorv32_rte_handler_install(GPIO_TRAP_CODE, gpio_interrupt_handler);
+  // Enable GPIO FIRQ channel in CPU
+  neorv32_cpu_csr_set(CSR_MIE, 1 << GPIO_FIRQ_ENABLE);
+  // Enable global interrupts
+  neorv32_cpu_csr_set(CSR_MSTATUS, 1 << CSR_MSTATUS_MIE);
+  
+  // Configure interrupt for rising edge on our specific pin
+  // neorv32_gpio_irq_setup(GPIO_IRQ_PIN, GPIO_TRIG_EDGE_RISING);
+  neorv32_gpio_irq_setup(GPIO_IRQ_PIN, GPIO_TRIG_EDGE_FALLING);
+  
+  // Enable interrupt for the specific GPIO pin
+  neorv32_gpio_irq_enable(1 << GPIO_IRQ_PIN);
+  
+  
+  
+  neorv32_uart0_printf("GPIO interrupt configured. \n\n");
+  // ----------------------------------------------------------
 
-  // Configure TWI for 100kHz operation (assuming 100MHz system clock)
-  // SCL_PRSC = 4, CLK_PRSC = 128 -> 100MHz / (4 * 128)/2 = 100kHz
-  // SCL_CDIV = 0
+
+  // check if TWI unit is implemented at all
+  if (neorv32_twi_available() == 0) {
+    neorv32_uart0_printf("ERROR! TWI controller not available!\n");
+    return 1;
+  }
+
+  // Configure TWI for 100kHz operation
   neorv32_twi_setup(CLK_PRSC_128, 1, 0);
 
   // Diagnostic Step 1: Scan the bus
-  neorv32_uart0_printf("--- Starting I2C Bus Scan ---");
+  neorv32_uart0_printf("--- Starting I2C Bus Scan ---\n");
   bus_scan();
   neorv32_uart0_printf("--- Scan Complete ---\n\n");
 
@@ -98,7 +155,7 @@ int main() {
   }
   else {
     neorv32_uart0_printf(" FAILED!\n");
-    neorv32_uart0_printf("Test halted.");
+    neorv32_uart0_printf("Test halted.\n");
     return 1;
   }
 
@@ -110,7 +167,7 @@ int main() {
   }
   else {
     neorv32_uart0_printf(" FAILED!\n");
-    neorv32_uart0_printf("Test halted.");
+    neorv32_uart0_printf("Test halted.\n");
     return 1;
   }
 
@@ -122,13 +179,21 @@ int main() {
   neorv32_uart0_printf("\n");
 
   if (tx_data == rx_data) {
-    neorv32_uart0_printf("SUCCESS! Data matches.");
+    neorv32_uart0_printf("SUCCESS! Data matches.\n");
   }
   else {
-    neorv32_uart0_printf("ERROR! Data mismatch!");
+    neorv32_uart0_printf("ERROR! Data mismatch!\n");
   }
 
-  neorv32_uart0_printf("\nTest complete.");
+  neorv32_uart0_printf("\nI2C test complete. Program will now wait for GPIO interrupts.\n");
+
+  // Wait for GPIO interrupts indefinitely
+  int cnt = 0;
+  while(1) {
+    neorv32_gpio_port_set(cnt++ & 0xFF); // increment counter and mask for lowest 8 bit
+    delay_ms(250); // wait 250ms using busy wait
+    // you can put other non-blocking code here
+  }
 
   return 0;
 }
@@ -169,10 +234,6 @@ void bus_scan(void) {
 
 /**********************************************************************//**
  * Write a single byte to EEPROM.
- *
- * @param[in] address 9-bit EEPROM memory address.
- * @param[in] data Byte to write.
- * @return 0 on success, 1 on error (NACK).
  **************************************************************************/
 int eeprom_write_byte(uint16_t address, uint8_t data) {
 
@@ -181,81 +242,51 @@ int eeprom_write_byte(uint16_t address, uint8_t data) {
 
   neorv32_twi_generate_start();
 
-  // send device address
   if (neorv32_twi_transfer(&device_addr_byte, 0)) {
-    neorv32_uart0_printf(" [NACK on device address] ");
     neorv32_twi_generate_stop();
     return 1;
   }
-
-  // send word address
   if (neorv32_twi_transfer(&word_addr_byte, 0)) {
-    neorv32_uart0_printf(" [NACK on word address] ");
     neorv32_twi_generate_stop();
     return 1;
   }
-
-  // send data
   if (neorv32_twi_transfer(&data, 0)) {
-    neorv32_uart0_printf(" [NACK on data] ");
     neorv32_twi_generate_stop();
     return 1;
   }
 
   neorv32_twi_generate_stop();
-
-  // Wait for internal write cycle to complete (t_WR is max 5ms for AT24C04)
-  // neorv32_cpu_
   delay_ms(5);
-
   return 0;
 }
 
 
 /**********************************************************************//**
  * Read a single byte from EEPROM.
- *
- * @param[in] address 9-bit EEPROM memory address.
- * @param[in,out] data Pointer to store the read byte.
- * @return 0 on success, 1 on error (NACK).
  **************************************************************************/
 int eeprom_read_byte(uint16_t address, uint8_t *data) {
 
-  uint8_t device_addr_byte_write = (EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x02) | 0; // LSB=0 for write
-  uint8_t device_addr_byte_read  = (EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x02) | 1; // LSB=1 for read
+  uint8_t device_addr_byte_write = (EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x02) | 0;
+  uint8_t device_addr_byte_read  = (EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x02) | 1;
   uint8_t word_addr_byte = (uint8_t)address;
   uint8_t rx_buffer = 0xff;
 
-  // --- set address pointer ---
   neorv32_twi_generate_start();
-
-  // send device address (write)
   if (neorv32_twi_transfer(&device_addr_byte_write, 0)) {
-    neorv32_uart0_printf(" [NACK on dev-addr wr] ");
     neorv32_twi_generate_stop();
     return 1;
   }
-
-  // send word address
   if (neorv32_twi_transfer(&word_addr_byte, 0)) {
-    neorv32_uart0_printf(" [NACK on word-addr wr] ");
     neorv32_twi_generate_stop();
     return 1;
   }
 
-  // --- read data from address ---
   neorv32_twi_generate_start(); // repeated start
-
-  // send device address (read)
   if (neorv32_twi_transfer(&device_addr_byte_read, 0)) {
-    neorv32_uart0_printf(" [NACK on dev-addr rd] ");
     neorv32_twi_generate_stop();
     return 1;
   }
-
-  // receive data from slave, send NACK to slave to signal end of read
-  neorv32_twi_transfer(&rx_buffer, 0);
-
+  neorv32_twi_transfer(&rx_buffer, 1); // send NACK to slave
   neorv32_twi_generate_stop();
 
   *data = rx_buffer;
@@ -265,8 +296,6 @@ int eeprom_read_byte(uint16_t address, uint8_t *data) {
 
 /**********************************************************************//**
  * Print byte as hex chars via UART0.
- *
- * @param data 8-bit data to be printed as two hex chars.
  **************************************************************************/
 void print_hex_byte(uint8_t data) {
 
@@ -274,4 +303,18 @@ void print_hex_byte(uint8_t data) {
 
   neorv32_uart0_putc(symbols[(data >> 4) & 15]);
   neorv32_uart0_putc(symbols[(data >> 0) & 15]);
+}
+
+
+/**********************************************************************//**
+ * Print 32-bit number as hex chars via UART0 (from temp.c)
+ **************************************************************************/
+static void puth(uint32_t num) {
+
+  int i = 0;
+  const char hex_symbols[] = "0123456789ABCDEF";
+  for (i=0; i<8; i++) {
+    uint32_t index = (num >> (28 - 4*i)) & 0xF;
+    neorv32_uart0_putc(hex_symbols[index]);
+  }
 }

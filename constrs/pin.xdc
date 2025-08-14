@@ -65,9 +65,9 @@ set_property -dict {PACKAGE_PIN J21 IOSTANDARD LVCMOS33} [get_ports {o_led[2]}]
 set_property -dict {PACKAGE_PIN AA27 IOSTANDARD LVCMOS33} [get_ports {o_led[1]}]
 set_property -dict {PACKAGE_PIN AB28 IOSTANDARD LVCMOS33} [get_ports {o_led[0]}]
 #------------------- key ----------------------
-# set_property -dict {PACKAGE_PIN D26 IOSTANDARD LVCMOS33} [get_ports {i_key[0]}]
-# set_property -dict {PACKAGE_PIN G25 IOSTANDARD LVCMOS33} [get_ports {i_key[1]}]
-# set_property -dict {PACKAGE_PIN E26 IOSTANDARD LVCMOS33} [get_ports {i_key[2]}]
+# set_property -dict {PACKAGE_PIN AH29 IOSTANDARD LVCMOS33} [get_ports {i_key[0]}]
+set_property -dict {PACKAGE_PIN Y28 IOSTANDARD LVCMOS33} [get_ports {i_key[0]}]
+set_property -dict {PACKAGE_PIN AA28 IOSTANDARD LVCMOS33} [get_ports {i_key[1]}]
 # set_property -dict {PACKAGE_PIN G26 IOSTANDARD LVCMOS33} [get_ports {i_key[3]}]
 # set_property -dict {PACKAGE_PIN H26 IOSTANDARD LVCMOS33} [get_ports {i_key[4]}]
 #------------------- UART ----------------------
@@ -132,6 +132,7 @@ set_property -dict {PACKAGE_PIN AC30 IOSTANDARD LVCMOS33} [get_ports iic_temp_sc
 # set_property -dict {PACKAGE_PIN AF25 IOSTANDARD TMDS_33} [get_ports {o_TMDS1_N[0]}]
 # set_property -dict {PACKAGE_PIN AF23 IOSTANDARD TMDS_33} [get_ports {o_TMDS1_N[1]}]
 # set_property -dict {PACKAGE_PIN AC24 IOSTANDARD TMDS_33} [get_ports {o_TMDS1_N[2]}]
+
 
 
 

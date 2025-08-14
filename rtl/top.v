@@ -55,7 +55,7 @@ module top #(
     // inout  wire         iic_sensor_sda,
     inout  wire         iic_temp_scl,
     inout  wire         iic_temp_sda,
-    // input  wire [5-1:0] i_key,
+    input  wire [2-1:0] i_key,
     output wire [3-1:0] o_led
 );
 
@@ -405,11 +405,39 @@ module top #(
         .rst(~mmcm_locked),
         .out(rst_160m_int)
     );
-
+wire           [ 1  - 1 : 0 ]          o_Field_rst               ;
+reg           [ 1  - 1 : 0 ]          gpio_filed_int               ;
+always @ ( posedge clk_100m_int ) begin
+    if(rst_100m_int) gpio_filed_int<='d0;
+    else if(o_Field_rst)gpio_filed_int<=~gpio_filed_int;
+end
+gen_test # (
+    .STS_FREQ(100_000_000)
+  )
+  gen_test_inst (
+    .i_Sys_clk(clk_100m_int),
+    .i_Rst_n(~rst_100m_int),
+    .o_Field_rst(o_Field_rst)
+  );
+  wire           [ 2  - 1 : 0 ]          key_debounce               ;
+debounce_v2 #(
+  .WIDTH( 2 ),
+  .SAMPLING_FACTOR( 3 )
+) DB1 (
+  .clk( clk_100m_int ),
+  .nrst( 1'b1 ),
+  .ena( 1'b1 ),
+  .in( i_key ),
+  .out( key_debounce )
+);
     wire twi_sda_i;
     wire twi_sda_o;
     wire twi_scl_i;
     wire twi_scl_o;
+    wire [31:0]gpio_i;
+    wire [31:0]gpio_o;
+    assign gpio_i = {30'd0,gpio_filed_int,key_debounce};
+    assign o_led = gpio_o[2:0];
     neorv32_top #(
         .CLOCK_FREQUENCY(100_000_000),
         .BOOT_MODE_SELECT(0),
@@ -428,7 +456,8 @@ module top #(
     ) neorv32_top_inst (
         .clk_i      (clk_100m_int),
         .rstn_i     (~rst_100m_int),
-        .gpio_o     (o_led),
+        .gpio_i     (gpio_i),
+        .gpio_o     (gpio_o),
         .twi_sda_i  (twi_sda_i),
         .twi_sda_o  (twi_sda_o),
         .twi_scl_i  (twi_scl_i),
