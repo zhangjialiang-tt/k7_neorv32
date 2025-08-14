@@ -8,9 +8,9 @@
 # k7_base corresponds to Little Panda development board
 # mlk_base corresponds to Mi Lian Ke development board (not implemented)
 #! Note: Do not add spaces after variable names
-PROJECT_NAME ?= k7_dma
+PROJECT_NAME ?= k7_neorv32#mlk_k7_base
 # Vivado Part
-PART_NAME ?= xc7k325tffg676-2
+PART_NAME ?= xc7k325tffg900-2#xc7k325tffg676-2#xc7a200tfbg900-2
 BLOCK_DESIGN_NAME ?= design_1
 # Vivado Executable (adjust if necessary)
 VIVADO := vivado

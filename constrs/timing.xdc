@@ -1,5 +1,4 @@
-create_clock -period 20.000 -name i_clk [get_ports i_clk]
-
+create_clock -period 10.000 -name i_clk [get_ports i_clk]
 # Ethernet constraints
 
 # IDELAY on RGMII from PHY chip
