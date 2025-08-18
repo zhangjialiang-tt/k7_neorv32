@@ -6,14 +6,19 @@
 // --- GPIO Abstraction ---
 // Example abstraction for GPIO pins
 // Define your specific pin usages here
-#define LED_PIN 0    // Example: LED on GPIO pin 0
-#define BUTTON_PIN 1 // Example: Button on GPIO pin 1
+#define LED_PIN        0  // Example: LED on GPIO pin 0
+#define BUTTON_PIN     1  // Example: Button on GPIO pin 1
 
 // --- GPIO Interrupt Abstraction ---
 /** GPIO pin for external interrupt */
 #define GPIO_IRQ_PIN 0
 // Globals for GPIO interrupt
 extern volatile uint32_t ext_irq_count;
+
+// --- TWI Abstraction ---
+/** I2C device address of the AT24C04 EEPROM.
+ * This assumes the address pins A1 and A2 are grounded. */
+#define HAL_TWI_EEPROM_DEVICE_ADDR 0b1010000
 
 /**
  * @brief Initialize the HAL layer.
@@ -101,5 +106,34 @@ void hal_gpio_irq_init(void);
  * @brief GPIO interrupt handler.
  */
 void hal_gpio_interrupt_handler(void);
+
+// --- TWI Abstraction ---
+/**
+ * @brief Initialize TWI (I2C) interface.
+ * Checks for TWI availability and configures it for 100kHz operation.
+ * @return 0 on success, -1 if TWI is not available.
+ */
+int hal_twi_init(void);
+
+/**
+ * @brief Scan TWI bus for devices and print results via UART.
+ */
+void hal_twi_bus_scan(void);
+
+/**
+ * @brief Write a single byte to an EEPROM.
+ * @param address The EEPROM memory address to write to (0-0x01FF for AT24C04).
+ * @param data The data byte to write.
+ * @return 0 on success, -1 on failure (NACK received).
+ */
+int hal_twi_eeprom_write_byte(uint16_t address, uint8_t data);
+
+/**
+ * @brief Read a single byte from an EEPROM.
+ * @param address The EEPROM memory address to read from (0-0x01FF for AT24C04).
+ * @param data Pointer to store the read data byte.
+ * @return 0 on success, -1 on failure (NACK received).
+ */
+int hal_twi_eeprom_read_byte(uint16_t address, uint8_t *data);
 
 #endif // APP_HAL_H
