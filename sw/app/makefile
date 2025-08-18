@@ -19,7 +19,8 @@ APP_SRC += hal.c
 # ASM_INC += -I ./my_asm_include_dir
 
 # Optimization level
-EFFORT ?= -Os
+# EFFORT ?= -Os
+EFFORT ?= -O2
 
 # CPU architecture and ABI
 # The default is rv32i_zicsr_zifencei (integer-only ISA)

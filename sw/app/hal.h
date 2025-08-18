@@ -6,8 +6,14 @@
 // --- GPIO Abstraction ---
 // Example abstraction for GPIO pins
 // Define your specific pin usages here
-#define LED_PIN        0  // Example: LED on GPIO pin 0
-#define BUTTON_PIN     1  // Example: Button on GPIO pin 1
+#define LED_PIN 0    // Example: LED on GPIO pin 0
+#define BUTTON_PIN 1 // Example: Button on GPIO pin 1
+
+// --- GPIO Interrupt Abstraction ---
+/** GPIO pin for external interrupt */
+#define GPIO_IRQ_PIN 0
+// Globals for GPIO interrupt
+extern volatile uint32_t ext_irq_count;
 
 /**
  * @brief Initialize the HAL layer.
@@ -79,19 +85,21 @@ void hal_uart0_putc(char c);
  */
 char hal_uart0_getc(void);
 
-// --- Timer Abstraction ---
-/**
- * @brief Get the current system time in milliseconds (based on MTIMER).
- * @note This is a simplified example. For more precision, consider using the RISC-V cycle CSR directly or a dedicated timer.
- * @return Current time in milliseconds.
- */
-uint64_t hal_time_ms(void);
-
 /**
  * @brief Busy-wait for a specified number of milliseconds.
  * @param ms Number of milliseconds to wait.
  */
 void hal_delay_ms(uint32_t ms);
 
+// --- GPIO Interrupt Abstraction ---
+/**
+ * @brief Initialize GPIO interrupt.
+ */
+void hal_gpio_irq_init(void);
+
+/**
+ * @brief GPIO interrupt handler.
+ */
+void hal_gpio_interrupt_handler(void);
 
 #endif // APP_HAL_H
