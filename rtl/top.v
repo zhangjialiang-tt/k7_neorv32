@@ -44,18 +44,18 @@ module top #(
     output      [  3:0] ddr3_dm,                //ddr3_dm
     output      [  0:0] ddr3_odt,               //ddr3_odt
 `endif
-    inout  wire         system_spi_0_io0_io,
-    inout  wire         system_spi_0_io1_io,
-    inout  wire         system_spi_0_io2_io,
-    inout  wire         system_spi_0_io3_io,
-    inout  wire         system_spi_0_ss_io,
-    input  wire         system_uart_debug_rxd,
-    output wire         system_uart_debug_txd,
-    // inout  wire         iic_sensor_scl,
-    // inout  wire         iic_sensor_sda,
-    inout  wire         iic_temp_scl,
-    inout  wire         iic_temp_sda,
-    input  wire [2-1:0] i_key,
+    inout  wire         system_spi_0_io0_io   ,
+    inout  wire         system_spi_0_io1_io   ,
+    inout  wire         system_spi_0_io2_io   ,
+    inout  wire         system_spi_0_io3_io   ,
+    inout  wire         system_spi_0_ss_io    ,
+    input  wire         system_uart_debug_rxd ,
+    output wire         system_uart_debug_txd ,
+    inout  wire         iic_sensor_scl        ,//adv7611
+    inout  wire         iic_sensor_sda        ,
+    inout  wire         iic_temp_scl          ,//EEPROM
+    inout  wire         iic_temp_sda          ,
+    input  wire [2-1:0] i_key                 ,
     output wire [3-1:0] o_led
 );
 
@@ -436,8 +436,27 @@ debounce_v2 #(
     wire twi_scl_o;
     wire [31:0]gpio_i;
     wire [31:0]gpio_o;
-    assign gpio_i = {30'd0,gpio_filed_int,key_debounce};
+    wire i2c_bus_select;
+
+    assign gpio_i = {30'd0,key_debounce,gpio_filed_int};
     assign o_led = gpio_o[2:0];
+    assign i2c_bus_select = gpio_o[9];
+/*
+外设说明：
+gpio—o：
+[1:0]-开：1  关：2
+[2:2]-sleep :0 unsleep:1
+[3:3]-sensor_3v3_en
+[4:4]-sensor_dvdd 1.8v
+[5:5]-sensor_avdd 3.6v
+[6:6]-sensor_vdet 6.8v
+[7:7]-MC时钟使能
+[8:8]-探测器复位信号
+[9:9]-iic设备选择
+
+gpio—i：
+[0:0]-场中断 20ms
+*/
     neorv32_top #(
         .CLOCK_FREQUENCY(100_000_000),
         .BOOT_MODE_SELECT(0),
@@ -448,7 +467,7 @@ debounce_v2 #(
         .IMEM_SIZE(16 * 1024),
         .DMEM_EN(1'b1),
         .DMEM_SIZE(8 * 1024),
-        .IO_GPIO_NUM(3),
+        .IO_GPIO_NUM(10),
         .IO_CLINT_EN(1'b1),
         .IO_UART0_EN(1'b1),
         .IO_UART1_EN(1'b1),
@@ -466,16 +485,21 @@ debounce_v2 #(
         .uart0_rxd_i(system_uart_debug_rxd)
     );
 
-    // 2. 实现三态缓冲逻辑 (核心部分)
+    // I2C MUX
+    // Bus 0: iic_temp (EEPROM)
+    // Bus 1: iic_sensor (adv7611)
 
-    // 将管脚的输入直接连接到 neorv32 的输入端口
-    assign twi_sda_i = iic_temp_sda;
-    assign twi_scl_i = iic_temp_scl;
+    // SCL and SDA output logic with tri-state buffers
+    assign iic_temp_scl   = (i2c_bus_select == 0) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
+    assign iic_temp_sda   = (i2c_bus_select == 0) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
 
-    // 使用 assign 和条件运算符 (?:) 来描述三态行为
-    // 当 neorv32 的输出为 0 时，驱动管脚为 0
-    // 当 neorv32 的输出为 1 时，驱动管脚为高阻态 'z'
-    assign iic_temp_sda = twi_sda_o ? 1'bz : 1'b0;
-    assign iic_temp_scl = twi_scl_o ? 1'bz : 1'b0;
+    assign iic_sensor_scl = (i2c_bus_select == 1) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
+    assign iic_sensor_sda = (i2c_bus_select == 1) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+
+    // SDA input logic
+    assign twi_sda_i = (i2c_bus_select == 1) ? iic_sensor_sda : iic_temp_sda;
+
+    // SCL input is just pass-through, as SCL is master-driven
+    assign twi_scl_i = (i2c_bus_select == 1) ? iic_sensor_scl : iic_temp_scl;
     //**********************************************************************************************
 endmodule

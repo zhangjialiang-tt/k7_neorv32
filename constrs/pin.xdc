@@ -114,8 +114,8 @@ set_property -dict {PACKAGE_PIN R25 IOSTANDARD LVCMOS33} [get_ports system_spi_0
 set_property -dict {PACKAGE_PIN R20 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io2_io]
 set_property -dict {PACKAGE_PIN R21 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io3_io]
 # I2C Pins (EEPROM - Page 16)
-# set_property -dict {PACKAGE_PIN A21 IOSTANDARD LVCMOS18} [get_ports iic_sensor_sda]
-# set_property -dict {PACKAGE_PIN A20 IOSTANDARD LVCMOS18} [get_ports iic_sensor_scl]
+set_property -dict {PACKAGE_PIN H30 IOSTANDARD LVCMOS33} [get_ports iic_sensor_sda]
+set_property -dict {PACKAGE_PIN F28 IOSTANDARD LVCMOS33} [get_ports iic_sensor_scl]
 #------------------- EEPROM,AT24C04 ----------------------
 set_property -dict {PACKAGE_PIN AH29 IOSTANDARD LVCMOS33} [get_ports iic_temp_sda]
 set_property -dict {PACKAGE_PIN AC30 IOSTANDARD LVCMOS33} [get_ports iic_temp_scl]
