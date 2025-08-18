@@ -33,9 +33,10 @@ void hal_init(void)
 
     // Initialize GPIO interrupt for external signal counting
     hal_gpio_irq_init();
-    
+
     // Initialize TWI (I2C) interface
-    if (hal_twi_init() != 0) {
+    if (hal_twi_init(CLK_PRSC_128, 1, 0) != 0) // 100kHz operation
+    {
         hal_uart0_print("ERROR! Failed to initialize TWI.\n");
     }
 
@@ -195,7 +196,7 @@ char hal_uart0_getc(void)
 /**
  * @brief Busy-wait for a specified number of milliseconds.
  * @param ms Number of milliseconds to wait.
- * 
+ *
  * @note This function uses the auxiliary delay function which in turn uses
  * the system timer (MTIMER). It is a busy-wait implementation and will block
  * the CPU for the duration of the delay.
@@ -255,7 +256,7 @@ void hal_gpio_irq_init(void)
  * @brief GPIO interrupt handler for external signal counting.
  * This function is called whenever a falling edge is detected on GPIO pin 1.
  * It increments a counter and prints a message every 50 interrupts (1 second).
- * 
+ *
  * @note This function runs in an interrupt context. It should be as short
  * and fast as possible. Avoid complex operations or blocking calls.
  * The `ext_irq_count` variable is declared as volatile to ensure
@@ -291,10 +292,13 @@ void hal_gpio_interrupt_handler(void)
 
 /**
  * @brief Initialize TWI (I2C) interface.
- * Checks for TWI availability and configures it for 100kHz operation.
+ * Checks for TWI availability and configures it with the specified clock prescaler and divider.
+ * @param clk_prsc Clock prescaler value (e.g., CLK_PRSC_128 for 100kHz).
+ * @param clk_div Clock divider value.
+ * @param stretch Enable clock stretching (1) or disable (0).
  * @return 0 on success, -1 if TWI is not available.
  */
-int hal_twi_init(void)
+int hal_twi_init(uint32_t clk_prsc, uint32_t clk_div, uint32_t stretch)
 {
     // Check if TWI unit is implemented in the hardware configuration
     if (neorv32_twi_available() == 0)
@@ -302,13 +306,160 @@ int hal_twi_init(void)
         return -1; // TWI not available
     }
 
-    // Configure TWI for 100kHz operation
-    // CLK_PRSC_128: Clock prescaler
-    // 1: SCL clock divider (CLDIV register)
-    // 0: No clock stretching
-    neorv32_twi_setup(CLK_PRSC_128, 1, 0);
-    
+    // Configure TWI with the provided parameters
+    neorv32_twi_setup(clk_prsc, clk_div, stretch);
+
     hal_uart0_print("TWI initialized.\n");
+    return 0; // Success
+}
+
+/**
+ * @brief Perform a TWI (I2C) write transaction to a slave device.
+ * This function handles the START, address transmission, data write, and STOP.
+ * @param slave_addr 7-bit slave address (shifted left by 1 internally if needed).
+ * @param data Pointer to the data buffer to write.
+ * @param len Length of the data buffer.
+ * @return 0 on success, -1 on failure (NACK or other error).
+ */
+int hal_twi_write(uint8_t slave_addr, const uint8_t *data, uint32_t len)
+{
+    // Generate a START condition
+    neorv32_twi_generate_start();
+
+    // Prepare slave address for write (LSB = 0)
+    uint8_t addr_rw = (slave_addr << 1) | 0;
+
+    // Send the slave address
+    if (neorv32_twi_transfer(&addr_rw, 0)) // 0 = send data
+    {
+        neorv32_twi_generate_stop();
+        return -1; // NACK or error
+    }
+
+    // Send the data bytes
+    for (uint32_t i = 0; i < len; i++)
+    {
+        uint8_t byte = data[i];
+        if (neorv32_twi_transfer(&byte, 0)) // 0 = send data
+        {
+            neorv32_twi_generate_stop();
+            return -1; // NACK or error
+        }
+    }
+
+    // Generate a STOP condition
+    neorv32_twi_generate_stop();
+
+    return 0; // Success
+}
+
+/**
+ * @brief Perform a TWI (I2C) read transaction from a slave device.
+ * This function handles the START, address transmission, data read, and STOP.
+ * @param slave_addr 7-bit slave address (shifted left by 1 internally if needed).
+ * @param data Pointer to the buffer to store read data.
+ * @param len Length of the data to read.
+ * @return 0 on success, -1 on failure (NACK or other error).
+ */
+int hal_twi_read(uint8_t slave_addr, uint8_t *data, uint32_t len)
+{
+    // Generate a START condition
+    neorv32_twi_generate_start();
+
+    // Prepare slave address for read (LSB = 1)
+    uint8_t addr_rw = (slave_addr << 1) | 1;
+
+    // Send the slave address
+    if (neorv32_twi_transfer(&addr_rw, 0)) // 0 = send data
+    {
+        neorv32_twi_generate_stop();
+        return -1; // NACK or error
+    }
+
+    // Read the data bytes
+    for (uint32_t i = 0; i < len; i++)
+    {
+        // For the last byte, send NACK (1), otherwise ACK (0)
+        int nack = (i == len - 1) ? 1 : 0;
+        if (neorv32_twi_transfer(&data[i], nack)) // nack = receive with ACK/NACK
+        {
+            neorv32_twi_generate_stop();
+            return -1; // Error
+        }
+    }
+
+    // Generate a STOP condition
+    neorv32_twi_generate_stop();
+
+    return 0; // Success
+}
+
+/**
+ * @brief Perform a combined TWI (I2C) write-then-read transaction.
+ * Useful for reading from a register after writing the register address.
+ * @param slave_addr 7-bit slave address.
+ * @param wr_data Pointer to the write data buffer (e.g., register address).
+ * @param wr_len Length of the write data.
+ * @param rd_data Pointer to the read data buffer.
+ * @param rd_len Length of the read data.
+ * @return 0 on success, -1 on failure (NACK or other error).
+ */
+int hal_twi_write_read(uint8_t slave_addr, const uint8_t *wr_data, uint32_t wr_len, uint8_t *rd_data, uint32_t rd_len)
+{
+    // --- Write Phase ---
+    // Generate a START condition
+    neorv32_twi_generate_start();
+
+    // Prepare slave address for write (LSB = 0)
+    uint8_t addr_wr = (slave_addr << 1) | 0;
+
+    // Send the slave address for write
+    if (neorv32_twi_transfer(&addr_wr, 0))
+    {
+        neorv32_twi_generate_stop();
+        return -1;
+    }
+
+    // Send the write data (e.g., register address)
+    for (uint32_t i = 0; i < wr_len; i++)
+    {
+        uint8_t byte = wr_data[i];
+        if (neorv32_twi_transfer(&byte, 0))
+        {
+            neorv32_twi_generate_stop();
+            return -1;
+        }
+    }
+
+    // --- Read Phase ---
+    // Generate a repeated START condition
+    neorv32_twi_generate_start();
+
+    // Prepare slave address for read (LSB = 1)
+    uint8_t addr_rd = (slave_addr << 1) | 1;
+
+    // Send the slave address for read
+    if (neorv32_twi_transfer(&addr_rd, 0))
+    {
+        neorv32_twi_generate_stop();
+        return -1;
+    }
+
+    // Read the data bytes
+    for (uint32_t i = 0; i < rd_len; i++)
+    {
+        // For the last byte, send NACK (1), otherwise ACK (0)
+        int nack = (i == rd_len - 1) ? 1 : 0;
+        if (neorv32_twi_transfer(&rd_data[i], nack))
+        {
+            neorv32_twi_generate_stop();
+            return -1;
+        }
+    }
+
+    // Generate a STOP condition
+    neorv32_twi_generate_stop();
+
     return 0; // Success
 }
 
@@ -328,33 +479,17 @@ void hal_twi_bus_scan(void)
     // Iterate through all possible 7-bit addresses
     for (i = 0; i < 128; i++)
     {
-        // Generate a START condition
-        neorv32_twi_generate_start();
-        
-        // Prepare the device address for writing (LSB = 0)
-        uint8_t addr_rw = (i << 1) | 0;
-        
-        // Attempt to transfer the address and check for ACK
-        // The second parameter '0' indicates we are sending data
-        int ack = neorv32_twi_transfer(&addr_rw, 0);
-        
-        // Generate a STOP condition to complete the transaction
-        neorv32_twi_generate_stop();
-
-        // If ACK was received (ack == 0), a device is present at this address
-        if (ack == 0)
+        // Use the generic write function to probe (send 0 bytes after address)
+        if (hal_twi_write(i, NULL, 0) == 0)
         {
             // Print the address of the found device
             hal_uart0_print(" + Device found at address 0x");
-            // Simple hex print (could be a helper function)
+            // Simple hex print
             static const char hex_symbols[] = "0123456789ABCDEF";
             hal_uart0_putc(hex_symbols[(i >> 4) & 0xF]);
             hal_uart0_putc(hex_symbols[(i >> 0) & 0xF]);
-            hal_uart0_print(" (write addr 0x");
-            hal_uart0_putc(hex_symbols[(addr_rw >> 4) & 0xF]);
-            hal_uart0_putc(hex_symbols[(addr_rw >> 0) & 0xF]);
-            hal_uart0_print(")\n");
-            
+            hal_uart0_print("\n");
+
             num_devices++;
         }
     }
@@ -367,149 +502,12 @@ void hal_twi_bus_scan(void)
     else
     {
         hal_uart0_print("Total devices found: ");
-        // Convert num_devices to string manually
-        // Handle hundreds place
-        if (num_devices >= 100) {
-            hal_uart0_putc('0' + (num_devices / 100));
-            num_devices %= 100;
-        }
-        // Handle tens place (or units if < 100)
-        if (num_devices >= 10 || (num_devices < 100 && num_devices >= 10)) {
-            hal_uart0_putc('0' + (num_devices / 10));
-            num_devices %= 10;
-        }
-        // Handle units place
-        hal_uart0_putc('0' + (num_devices % 10));
+        // Simple integer print (assuming small num_devices)
+        char buf[16];
+        neorv32_aux_itoa(buf, (uint32_t)num_devices, 10);  // Correct parameter order: buffer, number, base
+        hal_uart0_print(buf);
         hal_uart0_print("\n");
     }
-    
+
     hal_uart0_print("--- Scan Complete ---\n\n");
-}
-
-/**
- * @brief Write a single byte to an EEPROM.
- * This function writes a single byte to a specified address in an AT24C04 EEPROM.
- * It handles the device addressing, memory addressing, and data transmission.
- * 
- * @param address The EEPROM memory address to write to (0-0x01FF for AT24C04).
- *                The AT24C04 uses the lower 8 bits of the address directly
- *                and bits 8-9 are used in the device address byte.
- * @param data The data byte to write.
- * @return 0 on success, -1 on failure (NACK received during transfer).
- */
-int hal_twi_eeprom_write_byte(uint16_t address, uint8_t data)
-{
-    // Calculate the device address byte
-    // The base device address is shifted left by 1 bit.
-    // Bits 8 and 9 of the memory address (A9, A8) are used in the device address.
-    // For AT24C04, A1 and A0 pins are grounded, so the base address is 0b1010000.
-    // The LSB is 0 for a write operation.
-    uint8_t device_addr_byte = (HAL_TWI_EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x06) | 0;
-    
-    // The word (memory) address byte is the lower 8 bits of the address
-    uint8_t word_addr_byte = (uint8_t)(address & 0xFF);
-
-    // Generate a START condition on the TWI bus
-    neorv32_twi_generate_start();
-
-    // Send the device address byte
-    // If this or any subsequent transfer fails (returns non-zero), we have an error
-    if (neorv32_twi_transfer(&device_addr_byte, 0)) // 0 = send data
-    {
-        // If NACK received, generate STOP and return error
-        neorv32_twi_generate_stop();
-        return -1;
-    }
-
-    // Send the memory address byte
-    if (neorv32_twi_transfer(&word_addr_byte, 0)) // 0 = send data
-    {
-        neorv32_twi_generate_stop();
-        return -1;
-    }
-
-    // Send the data byte
-    if (neorv32_twi_transfer(&data, 0)) // 0 = send data
-    {
-        neorv32_twi_generate_stop();
-        return -1;
-    }
-
-    // Generate a STOP condition to complete the write transaction
-    neorv32_twi_generate_stop();
-    
-    // The EEPROM needs time to complete the write cycle internally.
-    // A small delay (e.g., 5ms) is usually sufficient for AT24Cxx series.
-    hal_delay_ms(5);
-    
-    // Return success
-    return 0;
-}
-
-/**
- * @brief Read a single byte from an EEPROM.
- * This function reads a single byte from a specified address in an AT24C04 EEPROM.
- * It involves a "write" transaction to set the address, followed by a "read" transaction.
- * 
- * @param address The EEPROM memory address to read from (0-0x01FF for AT24C04).
- *                The addressing scheme is the same as for writing.
- * @param data Pointer to store the read data byte.
- * @return 0 on success, -1 on failure (NACK received during transfer).
- */
-int hal_twi_eeprom_read_byte(uint16_t address, uint8_t *data)
-{
-    // Calculate the device address bytes for write and read phases
-    // Write phase: Send address, LSB = 0
-    uint8_t device_addr_byte_write = (HAL_TWI_EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x06) | 0;
-    // Read phase: Read data, LSB = 1
-    uint8_t device_addr_byte_read = (HAL_TWI_EEPROM_DEVICE_ADDR << 1) | ((address >> 7) & 0x06) | 1;
-    
-    // The word (memory) address byte is the lower 8 bits of the address
-    uint8_t word_addr_byte = (uint8_t)(address & 0xFF);
-    
-    // Buffer to receive the data byte
-    uint8_t rx_buffer = 0xFF; // Initialize with a default value
-
-    // --- Write Phase: Set the memory address ---
-    // Generate a START condition
-    neorv32_twi_generate_start();
-    
-    // Send the device address byte (for writing)
-    if (neorv32_twi_transfer(&device_addr_byte_write, 0)) // 0 = send data
-    {
-        neorv32_twi_generate_stop();
-        return -1;
-    }
-    
-    // Send the memory address byte
-    if (neorv32_twi_transfer(&word_addr_byte, 0)) // 0 = send data
-    {
-        neorv32_twi_generate_stop();
-        return -1;
-    }
-
-    // --- Read Phase: Read the data ---
-    // Generate a repeated START condition
-    neorv32_twi_generate_start();
-    
-    // Send the device address byte (for reading)
-    if (neorv32_twi_transfer(&device_addr_byte_read, 0)) // 0 = send data
-    {
-        neorv32_twi_generate_stop();
-        return -1;
-    }
-    
-    // Receive the data byte from the EEPROM
-    // The second parameter '1' indicates we are receiving data and will send a NACK
-    // after receiving this byte (since it's the last byte we want to read).
-    neorv32_twi_transfer(&rx_buffer, 1); // 1 = receive data and send NACK
-    
-    // Generate a STOP condition to complete the read transaction
-    neorv32_twi_generate_stop();
-
-    // Store the received data in the user-provided variable
-    *data = rx_buffer;
-    
-    // Return success
-    return 0;
 }

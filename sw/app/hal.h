@@ -110,10 +110,13 @@ void hal_gpio_interrupt_handler(void);
 // --- TWI Abstraction ---
 /**
  * @brief Initialize TWI (I2C) interface.
- * Checks for TWI availability and configures it for 100kHz operation.
+ * Checks for TWI availability and configures it with the specified clock prescaler and divider.
+ * @param clk_prsc Clock prescaler value (e.g., CLK_PRSC_128 for 100kHz).
+ * @param clk_div Clock divider value.
+ * @param stretch Enable clock stretching (1) or disable (0).
  * @return 0 on success, -1 if TWI is not available.
  */
-int hal_twi_init(void);
+int hal_twi_init(uint32_t clk_prsc, uint32_t clk_div, uint32_t stretch);
 
 /**
  * @brief Scan TWI bus for devices and print results via UART.
@@ -121,19 +124,35 @@ int hal_twi_init(void);
 void hal_twi_bus_scan(void);
 
 /**
- * @brief Write a single byte to an EEPROM.
- * @param address The EEPROM memory address to write to (0-0x01FF for AT24C04).
- * @param data The data byte to write.
- * @return 0 on success, -1 on failure (NACK received).
+ * @brief Perform a TWI (I2C) write transaction to a slave device.
+ * This function handles the START, address transmission, data write, and STOP.
+ * @param slave_addr 7-bit slave address.
+ * @param data Pointer to the data buffer to write.
+ * @param len Length of the data buffer.
+ * @return 0 on success, -1 on failure (NACK or other error).
  */
-int hal_twi_eeprom_write_byte(uint16_t address, uint8_t data);
+int hal_twi_write(uint8_t slave_addr, const uint8_t *data, uint32_t len);
 
 /**
- * @brief Read a single byte from an EEPROM.
- * @param address The EEPROM memory address to read from (0-0x01FF for AT24C04).
- * @param data Pointer to store the read data byte.
- * @return 0 on success, -1 on failure (NACK received).
+ * @brief Perform a TWI (I2C) read transaction from a slave device.
+ * This function handles the START, address transmission, data read, and STOP.
+ * @param slave_addr 7-bit slave address.
+ * @param data Pointer to the buffer to store read data.
+ * @param len Length of the data to read.
+ * @return 0 on success, -1 on failure (NACK or other error).
  */
-int hal_twi_eeprom_read_byte(uint16_t address, uint8_t *data);
+int hal_twi_read(uint8_t slave_addr, uint8_t *data, uint32_t len);
+
+/**
+ * @brief Perform a combined TWI (I2C) write-then-read transaction.
+ * Useful for reading from a register after writing the register address.
+ * @param slave_addr 7-bit slave address.
+ * @param wr_data Pointer to the write data buffer (e.g., register address).
+ * @param wr_len Length of the write data.
+ * @param rd_data Pointer to the read data buffer.
+ * @param rd_len Length of the read data.
+ * @return 0 on success, -1 on failure (NACK or other error).
+ */
+int hal_twi_write_read(uint8_t slave_addr, const uint8_t *wr_data, uint32_t wr_len, uint8_t *rd_data, uint32_t rd_len);
 
 #endif // APP_HAL_H
