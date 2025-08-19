@@ -7,10 +7,14 @@ APP_SRC = main.c
 APP_SRC += hal/hal_interrupt.c
 APP_SRC += hal/hal_gpio.c
 APP_SRC += hal/hal_uart.c
-# APP_SRC += hal/hal_twi.c
+APP_SRC += hal/hal_i2c.c
+APP_SRC += dev/dev_eeprom.c
+APP_SRC += app/app_uart.c
 
 # Add your application include folders (if any, besides the current directory)
 APP_INC += -I ./hal
+APP_INC += -I ./dev
+APP_INC += -I ./app
 
 # Add your application assembly sources (if any)
 # APP_SRC += my_asm.S

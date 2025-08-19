@@ -212,28 +212,6 @@ extern "C"
      */
     void hal_i2c_delay_ms(uint32_t ms);
 
-    /* ========================================== */
-    /*              EEPROM 专用函数               */
-    /* ========================================== */
-
-    /**
-     * @brief 向EEPROM写入单个字节
-     * @param base_addr: EEPROM基础设备地址(通常是0x50)
-     * @param address: EEPROM内部地址(对于AT24C04: 0-0x01FF)
-     * @param data: 要写入的数据
-     * @return HAL status
-     */
-    hal_i2c_status_t hal_i2c_eeprom_write_byte(uint8_t base_addr, uint16_t address, uint8_t data);
-
-    /**
-     * @brief 从EEPROM读取单个字节
-     * @param base_addr: EEPROM基础设备地址(通常是0x50)
-     * @param address: EEPROM内部地址(对于AT24C04: 0-0x01FF)
-     * @param data: 读取数据的指针
-     * @return HAL status
-     */
-    hal_i2c_status_t hal_i2c_eeprom_read_byte(uint8_t base_addr, uint16_t address, uint8_t *data);
-
     /**
      * @brief 扫描I2C总线上的设备
      * @param found_devices: 存储找到的设备地址的数组
