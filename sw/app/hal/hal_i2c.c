@@ -191,20 +191,16 @@ hal_i2c_status_t hal_i2c_receive_byte(uint8_t *data, bool send_ack)
         return HAL_I2C_NOT_AVAIL;
     }
 
-    int result = neorv32_twi_get(data);
+    uint8_t received_data = 0xFF; // 发送虚拟数据以产生时钟
 
-    if (result == 0)
-    {
-        // 成功接收数据
-        // 发送 ACK/NACK
-        uint8_t dummy = 0;
-        (void)neorv32_twi_transfer(&dummy, send_ack ? 1 : 0);
-        return HAL_I2C_OK;
-    }
-    else
-    {
-        return HAL_I2C_ERROR;
-    }
+    // 在主接收模式下, neorv32_twi_transfer 会产生时钟,
+    // 从从机接收一个字节, 并将其存储在提供的指针中。
+    // 'send_ack' 标志决定接收后是发送 ACK 还是 NACK。
+    neorv32_twi_transfer(&received_data, send_ack ? 1 : 0);
+
+    *data = received_data;
+
+    return HAL_I2C_OK;
 }
 
 hal_i2c_status_t hal_i2c_master_write(uint8_t slave_addr, const uint8_t *data, uint16_t size, uint32_t timeout_ms)
