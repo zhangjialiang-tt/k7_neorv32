@@ -1,42 +1,10 @@
-#include "hal/hal_gpio.h"
+#include "hal/hal_i2c.h"
 #include "hal/hal_uart.h"
-#include "hal/hal_interrupt.h"
-#include "../lib/include/neorv32_gpio.h" // 引入底层 BSP 接口
-// #include "../lib/include/neorv32_clint.h" // 引入底层 BSP 接口
-#include "../lib/include/neorv32.h" // 引入底层 BSP 接口
 #include <stdio.h>
-
-// 全局计数器变量
-static volatile uint32_t gpio_interrupt_counter = 0;
-static volatile uint32_t second_counter = 0;
-
-// 时间戳用于测量中断间隔
-static volatile uint32_t timestamp = 0;
-
-// GPIO 中断回调函数
-// void gpio_irq_callback(hal_gpio_pin_t pin)
-void gpio_irq_callback(void)
-{
-    neorv32_gpio_irq_clr(-1);
-    // 增加中断计数器
-    gpio_interrupt_counter++;
-
-    // 每50次中断打印一次
-    // if (gpio_interrupt_counter % 50 == 0)
-    // {
-    //     hal_uart_printf(HAL_UART_PORT_0, "GPIO%d interrupt count: %d\r\n", gpio_interrupt_counter);
-    // }
-}
-
+#define HAL_TWI_EEPROM_DEVICE_ADDR 0b1010000 // 0x50
 int main(void)
 {
-    // 初始化中断管理系统
-    if (hal_interrupt_init() != HAL_INTERRUPT_OK)
-    {
-        return -1;
-    }
-
-    // 初始化 UART 用于调试输出
+    // 初始化 UART 用于调试
     hal_uart_config_t uart_config = {
         .baudrate = 19200,
         .data_bits = HAL_UART_DATA_BITS_8,
@@ -49,66 +17,128 @@ int main(void)
         return -1;
     }
 
-    hal_uart_transmit_string(HAL_UART_PORT_0, "NEORV32 GPIO External Interrupt Demo\r\n");
+    hal_uart_transmit_string(HAL_UART_PORT_0, "I2C EEPROM Test Started\r\n");
 
-    // 检查 GPIO 是否可用
-    if (!hal_gpio_is_available())
+    // 检查 I2C 是否可用
+    if (!hal_i2c_is_available())
     {
-        hal_uart_transmit_string(HAL_UART_PORT_0, "GPIO not available!\r\n");
+        hal_uart_transmit_string(HAL_UART_PORT_0, "I2C not available!\r\n");
         return -1;
     }
 
-    // 注册 GPIO 中断回调函数
-    // if (hal_gpio_register_irq_callback(gpio_irq_callback) != HAL_GPIO_OK)
+    // 初始化 I2C (使用标准速度)
+    hal_i2c_config_t i2c_config = {
+        .speed = HAL_I2C_SPEED_STANDARD,
+        .addr_mode = HAL_I2C_ADDR_7BIT,
+        .clock_stretch = false,
+        .slave_addr = 0x00};
+
+    if (hal_i2c_init(&i2c_config) != HAL_I2C_OK)
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to initialize I2C!\r\n");
+        return -1;
+    }
+
+    if (hal_i2c_enable() != HAL_I2C_OK)
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable I2C!\r\n");
+        return -1;
+    }
+
+    hal_uart_transmit_string(HAL_UART_PORT_0, "I2C initialized successfully\r\n");
+
+    // 扫描 I2C 总线上的设备
+    hal_uart_transmit_string(HAL_UART_PORT_0, "Scanning I2C bus...\r\n");
+
+    uint8_t found_devices[32] = {0};
+    int device_count = hal_i2c_bus_scan(found_devices, 32);
+
+    hal_uart_printf(HAL_UART_PORT_0, "Found %d device(s) on I2C bus\r\n", device_count);
+
+    // 显示找到的设备
+    for (int i = 0; i < device_count && i < 32; i++)
+    {
+        hal_uart_printf(HAL_UART_PORT_0, " + Device found at address 0x%02X\r\n", found_devices[i]);
+    }
+
+    // 测试EEPROM操作
+    bool eeprom_found = true;
+    uint8_t eeprom_base_addr = 0x50;
+
+    // 查找EEPROM设备
+    // for (int i = 0; i < device_count; i++)
     // {
-    //     hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to register GPIO callback!\r\n");
-    //     return -1;
+    //     if (found_devices[i] >= 0x50 && found_devices[i] <= 0x57)
+    //     {
+    //         eeprom_base_addr = found_devices[i];
+    //         eeprom_found = true;
+    //         hal_uart_printf(HAL_UART_PORT_0, "EEPROM device detected at base address 0x%02X\r\n", eeprom_base_addr);
+    //         break;
+    //     }
     // }
 
-    // 注册 GPIO 中断处理函数 -install the handler
-    if (hal_interrupt_register_handler(HAL_INTERRUPT_GPIO, gpio_irq_callback) != HAL_INTERRUPT_OK)
+    if (eeprom_found)
     {
-        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to register GPIO interrupt handler!\r\n");
-        return -1;
-    }
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Testing EEPROM read/write operations...\r\n");
 
-    // 启用 GPIO 中断和全局中断 -neorv32_cpu_csr_set(CSR_MIE, irq_mask);
-    if (hal_interrupt_enable(HAL_INTERRUPT_GPIO) != HAL_INTERRUPT_OK)
+        // 测试地址
+        uint16_t test_addr = 0x0000;
+        uint8_t test_data = 0xAB;
+        uint8_t read_data = 0x00;
+
+        // 写入数据
+        hal_uart_printf(HAL_UART_PORT_0, "Writing 0x%02X to EEPROM address 0x%04X\r\n", test_data, test_addr);
+
+        hal_i2c_status_t write_result = hal_i2c_eeprom_write_byte(eeprom_base_addr, test_addr, test_data);
+
+        if (write_result == HAL_I2C_OK)
+        {
+            hal_uart_transmit_string(HAL_UART_PORT_0, "Data written successfully\r\n");
+
+            // 等待写入完成
+            hal_i2c_delay_ms(20);
+
+            // 读取数据
+            hal_uart_printf(HAL_UART_PORT_0, "Reading from EEPROM address 0x%04X\r\n", test_addr);
+
+            hal_i2c_status_t read_result = hal_i2c_eeprom_read_byte(eeprom_base_addr, test_addr, &read_data);
+
+            if (read_result == HAL_I2C_OK)
+            {
+                hal_uart_printf(HAL_UART_PORT_0, "Data read successfully: 0x%02X\r\n", read_data);
+                if (read_data == test_data)
+                {
+                    hal_uart_transmit_string(HAL_UART_PORT_0, "EEPROM read/write test PASSED\r\n");
+                }
+                else
+                {
+                    hal_uart_transmit_string(HAL_UART_PORT_0, "EEPROM read/write test FAILED - data mismatch\r\n");
+                    hal_uart_printf(HAL_UART_PORT_0, "Expected: 0x%02X, Got: 0x%02X\r\n", test_data, read_data);
+                }
+            }
+            else
+            {
+                hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to read from EEPROM\r\n");
+                hal_uart_printf(HAL_UART_PORT_0, "Read error code: %d\r\n", read_result);
+            }
+        }
+        else
+        {
+            hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to write to EEPROM\r\n");
+            hal_uart_printf(HAL_UART_PORT_0, "Write error code: %d\r\n", write_result);
+        }
+    }
+    else
     {
-        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable GPIO interrupt!\r\n");
-        return -1;
+        hal_uart_transmit_string(HAL_UART_PORT_0, "No EEPROM device found\r\n");
     }
 
-    // neorv32_cpu_csr_set(CSR_MSTATUS, 1 << CSR_MSTATUS_MIE);
-    if (hal_interrupt_enable_global() != HAL_INTERRUPT_OK)
-    {
-        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable global interrupts!\r\n");
-        return -1;
-    }
+    hal_uart_transmit_string(HAL_UART_PORT_0, "I2C EEPROM test completed\r\n");
 
-    // 配置 GPIO0 为输入并启用上升沿中断
-    if (hal_gpio_config_irq(0, HAL_GPIO_TRIG_EDGE_RISING) != HAL_GPIO_OK)
-    {
-        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to config GPIO0 interrupt!\r\n");
-        return -1;
-    }
-
-    if (hal_gpio_enable_irq(1U << 0) != HAL_GPIO_OK)
-    { // 使能 GPIO0 中断
-        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable GPIO0 interrupt!\r\n");
-        return -1;
-    }
-    hal_uart_transmit_string(HAL_UART_PORT_0, "GPIO demo started. GPIO0 configured for external interrupt\r\n");
-    hal_uart_transmit_string(HAL_UART_PORT_0, "Connect external signal to GPIO0 or simulate with software\r\n");
-
-    // 主循环 - 打印计数器状态
     while (1)
     {
-        if (gpio_interrupt_counter == 50)
-        {
-            hal_uart_printf(HAL_UART_PORT_0, "Main loop: interrupt count = %d\r\n", gpio_interrupt_counter);
-            gpio_interrupt_counter = 0; // 重置计数器
-        }
+        // 主循环
+        hal_i2c_delay_ms(1000); // 1秒延时
     }
 
     return 0;
