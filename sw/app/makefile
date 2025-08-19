@@ -4,10 +4,13 @@
 APP_SRC = main.c
 
 # Add your custom HAL C sources here
-APP_SRC += hal.c
+APP_SRC += hal/hal_interrupt.c
+APP_SRC += hal/hal_gpio.c
+APP_SRC += hal/hal_uart.c
+# APP_SRC += hal/hal_twi.c
 
 # Add your application include folders (if any, besides the current directory)
-# APP_INC += -I ./my_include_dir
+APP_INC += -I ./hal
 
 # Add your application assembly sources (if any)
 # APP_SRC += my_asm.S

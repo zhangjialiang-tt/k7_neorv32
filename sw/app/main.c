@@ -1,107 +1,115 @@
-#include "hal.h"
-// #include <stdio.h> // Removed to save space
+#include "hal/hal_gpio.h"
+#include "hal/hal_uart.h"
+#include "hal/hal_interrupt.h"
+#include "../lib/include/neorv32_gpio.h" // 引入底层 BSP 接口
+// #include "../lib/include/neorv32_clint.h" // 引入底层 BSP 接口
+#include "../lib/include/neorv32.h" // 引入底层 BSP 接口
+#include <stdio.h>
+
+// 全局计数器变量
+static volatile uint32_t gpio_interrupt_counter = 0;
+static volatile uint32_t second_counter = 0;
+
+// 时间戳用于测量中断间隔
+static volatile uint32_t timestamp = 0;
+
+// GPIO 中断回调函数
+// void gpio_irq_callback(hal_gpio_pin_t pin)
+void gpio_irq_callback(void)
+{
+    neorv32_gpio_irq_clr(-1);
+    // 增加中断计数器
+    gpio_interrupt_counter++;
+
+    // 每50次中断打印一次
+    // if (gpio_interrupt_counter % 50 == 0)
+    // {
+    //     hal_uart_printf(HAL_UART_PORT_0, "GPIO%d interrupt count: %d\r\n", gpio_interrupt_counter);
+    // }
+}
 
 int main(void)
 {
-    // Initialize the HAL layer
-    hal_init();
-
-    // Print a message via UART
-    hal_uart0_print("Hello from custom HAL with GPIO Interrupt Counter and TWI!\n");
-
-    // Set LED_PIN as output (implicitly done by writing to it)
-    hal_gpio_clear_pin(LED_PIN); // Start with LED off
-
-    // --- TWI EEPROM Test ---
-    // Diagnostic Step 1: Scan the bus
-    hal_uart0_print("--- Starting I2C Bus Scan ---\n");
-    hal_twi_bus_scan();
-    hal_uart0_print("--- Scan Complete ---\n\n");
-
-    // Test sequence
-    uint16_t test_addr = 0x0042; // EEPROM address to write to
-    uint8_t tx_data = 0xCA;      // Data to write
-    uint8_t rx_data = 0;         // Data to read
-
-    // Write byte
-    hal_uart0_print("Writing 0x");
-    // Simple hex print
-    static const char hex_symbols[] = "0123456789ABCDEF";
-    hal_uart0_putc(hex_symbols[(tx_data >> 4) & 0xF]);
-    hal_uart0_putc(hex_symbols[(tx_data >> 0) & 0xF]);
-    hal_uart0_print(" to EEPROM address 0x");
-    hal_uart0_putc(hex_symbols[(test_addr >> 12) & 0xF]);
-    hal_uart0_putc(hex_symbols[(test_addr >> 8) & 0xF]);
-    hal_uart0_putc(hex_symbols[(test_addr >> 4) & 0xF]);
-    hal_uart0_putc(hex_symbols[(test_addr >> 0) & 0xF]);
-    hal_uart0_print("...");
-
-    if (hal_twi_eeprom_write_byte(test_addr, tx_data) == 0) {
-        hal_uart0_print(" OK\n");
-    }
-    else {
-        hal_uart0_print(" FAILED!\n");
-        hal_uart0_print("Test halted.\n");
-        // In a real application, you might want to handle this error differently
-        // For now, we'll continue with the rest of the program
+    // 初始化中断管理系统
+    if (hal_interrupt_init() != HAL_INTERRUPT_OK)
+    {
+        return -1;
     }
 
-    // Read byte back
-    hal_uart0_print("Reading from EEPROM address 0x");
-    hal_uart0_putc(hex_symbols[(test_addr >> 12) & 0xF]);
-    hal_uart0_putc(hex_symbols[(test_addr >> 8) & 0xF]);
-    hal_uart0_putc(hex_symbols[(test_addr >> 4) & 0xF]);
-    hal_uart0_putc(hex_symbols[(test_addr >> 0) & 0xF]);
-    hal_uart0_print("...");
+    // 初始化 UART 用于调试输出
+    hal_uart_config_t uart_config = {
+        .baudrate = 19200,
+        .data_bits = HAL_UART_DATA_BITS_8,
+        .stop_bits = HAL_UART_STOP_BITS_1,
+        .parity = HAL_UART_PARITY_NONE,
+        .hw_flow_control = false};
 
-    if (hal_twi_eeprom_read_byte(test_addr, &rx_data) == 0) {
-        hal_uart0_print(" OK\n");
-    }
-    else {
-        hal_uart0_print(" FAILED!\n");
-        hal_uart0_print("Test halted.\n");
-        // In a real application, you might want to handle this error differently
+    if (hal_uart_init(HAL_UART_PORT_0, &uart_config) != HAL_UART_OK)
+    {
+        return -1;
     }
 
-    // Verify
-    hal_uart0_print("\nTX data: 0x");
-    hal_uart0_putc(hex_symbols[(tx_data >> 4) & 0xF]);
-    hal_uart0_putc(hex_symbols[(tx_data >> 0) & 0xF]);
-    hal_uart0_print(", RX data: 0x");
-    hal_uart0_putc(hex_symbols[(rx_data >> 4) & 0xF]);
-    hal_uart0_putc(hex_symbols[(rx_data >> 0) & 0xF]);
-    hal_uart0_print("\n");
+    hal_uart_transmit_string(HAL_UART_PORT_0, "NEORV32 GPIO External Interrupt Demo\r\n");
 
-    if (tx_data == rx_data) {
-        hal_uart0_print("SUCCESS! Data matches.\n");
-    }
-    else {
-        hal_uart0_print("ERROR! Data mismatch!\n");
+    // 检查 GPIO 是否可用
+    if (!hal_gpio_is_available())
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "GPIO not available!\r\n");
+        return -1;
     }
 
-    hal_uart0_print("\nI2C test complete. Program will now run GPIO interrupt counter.\n");
-    // --- End of TWI EEPROM Test ---
+    // 注册 GPIO 中断回调函数
+    // if (hal_gpio_register_irq_callback(gpio_irq_callback) != HAL_GPIO_OK)
+    // {
+    //     hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to register GPIO callback!\r\n");
+    //     return -1;
+    // }
 
-    // Main application loop
-    int cnt = 0;
+    // 注册 GPIO 中断处理函数 -install the handler
+    if (hal_interrupt_register_handler(HAL_INTERRUPT_GPIO, gpio_irq_callback) != HAL_INTERRUPT_OK)
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to register GPIO interrupt handler!\r\n");
+        return -1;
+    }
+
+    // 启用 GPIO 中断和全局中断 -neorv32_cpu_csr_set(CSR_MIE, irq_mask);
+    if (hal_interrupt_enable(HAL_INTERRUPT_GPIO) != HAL_INTERRUPT_OK)
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable GPIO interrupt!\r\n");
+        return -1;
+    }
+
+    // neorv32_cpu_csr_set(CSR_MSTATUS, 1 << CSR_MSTATUS_MIE);
+    if (hal_interrupt_enable_global() != HAL_INTERRUPT_OK)
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable global interrupts!\r\n");
+        return -1;
+    }
+
+    // 配置 GPIO0 为输入并启用上升沿中断
+    if (hal_gpio_config_irq(0, HAL_GPIO_TRIG_EDGE_RISING) != HAL_GPIO_OK)
+    {
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to config GPIO0 interrupt!\r\n");
+        return -1;
+    }
+
+    if (hal_gpio_enable_irq(1U << 0) != HAL_GPIO_OK)
+    { // 使能 GPIO0 中断
+        hal_uart_transmit_string(HAL_UART_PORT_0, "Failed to enable GPIO0 interrupt!\r\n");
+        return -1;
+    }
+    hal_uart_transmit_string(HAL_UART_PORT_0, "GPIO demo started. GPIO0 configured for external interrupt\r\n");
+    hal_uart_transmit_string(HAL_UART_PORT_0, "Connect external signal to GPIO0 or simulate with software\r\n");
+
+    // 主循环 - 打印计数器状态
     while (1)
     {
-        // Toggle the LED
-        hal_gpio_toggle_pin(LED_PIN);
-
-        // Print a message
-        hal_uart0_print("LED Toggled.\n");
-
-        // Delay for 1000 milliseconds
-        hal_delay_ms(1000);
-
-        // Increment counter and mask for lowest 8 bit
-        hal_gpio_set_port(cnt++ & 0xFF);
-
-        // The external interrupt counting is handled in the interrupt handler
-        // No need to check ext_irq_count here anymore
+        if (gpio_interrupt_counter == 50)
+        {
+            hal_uart_printf(HAL_UART_PORT_0, "Main loop: interrupt count = %d\r\n", gpio_interrupt_counter);
+            gpio_interrupt_counter = 0; // 重置计数器
+        }
     }
 
-    // The program should never reach here
     return 0;
 }
