@@ -20,10 +20,9 @@ use neorv32.neorv32_package.all;
 
 entity neorv32_top is
   generic (
-    -- Processor Clocking --
+    -- General --
     CLOCK_FREQUENCY       : natural                        := 0;           -- clock frequency of clk_i in Hz
-
-    -- Dual-Core Configuration --
+    TRACE_PORT_EN         : boolean                        := false;       -- enable CPU execution trace port
     DUAL_CORE_EN          : boolean                        := false;       -- enable dual-core homogeneous SMP
 
     -- Boot Configuration --
@@ -63,6 +62,7 @@ entity neorv32_top is
     RISCV_ISA_Zxcfu       : boolean                        := false;       -- implement custom (instr.) functions unit
 
     -- Tuning Options --
+    CPU_CONSTT_BR_EN      : boolean                        := false;       -- implement constant-time branches
     CPU_FAST_MUL_EN       : boolean                        := false;       -- use DSPs for M extension's multiplier
     CPU_FAST_SHIFT_EN     : boolean                        := false;       -- use barrel shifter for shift operations
     CPU_RF_HW_RST_EN      : boolean                        := false;       -- implement full hardware reset for register file
@@ -97,7 +97,7 @@ entity neorv32_top is
 
     -- External bus interface (XBUS) --
     XBUS_EN               : boolean                        := false;       -- implement external memory bus interface
-    XBUS_TIMEOUT          : natural                        := 255;         -- cycles after a pending bus access auto-terminates (0 = disabled)
+    XBUS_TIMEOUT          : natural                        := 2048;        -- cycles after a pending bus access auto-terminates (0 = disabled)
     XBUS_REGSTAGE_EN      : boolean                        := false;       -- add XBUS register stage
 
     -- Processor peripherals --
@@ -144,6 +144,10 @@ entity neorv32_top is
     rstn_i         : in  std_ulogic;                                        -- global reset, low-active, async
     rstn_ocd_o     : out std_ulogic;                                        -- on-chip debugger reset output, low-active, sync
     rstn_wdt_o     : out std_ulogic;                                        -- watchdog reset output, low-active, sync
+
+    -- Execution trace (available if TRACE_PORT_EN = true) --
+    trace_cpu0_o   : out trace_port_t;                                      -- CPU 0 trace port
+    trace_cpu1_o   : out trace_port_t;                                      -- CPU 1 trace port
 
     -- JTAG on-chip debugger interface (available if OCD_EN = true) --
     jtag_tck_i     : in  std_ulogic := 'L';                                 -- serial clock
@@ -264,6 +268,7 @@ architecture neorv32_top_rtl of neorv32_top is
   constant io_sysinfo_en_c : boolean := not IO_DISABLE_SYSINFO;
   constant ocd_auth_en_c   : boolean := OCD_EN and OCD_AUTHENTICATION;
   constant cpu_sdtrig_en_c : boolean := OCD_EN and boolean(OCD_NUM_HW_TRIGGERS > 0);
+  constant trace_en_c      : boolean := TRACE_PORT_EN or IO_TRACER_EN;
   constant tracer_log_en_c : boolean := IO_TRACER_SIMLOG_EN and is_simulation_c;
 
   -- make sure physical memory sizes are a power of two --
@@ -285,8 +290,8 @@ architecture neorv32_top_rtl of neorv32_top is
   signal dci_haltreq : std_ulogic_vector(num_cores_c-1 downto 0);
 
   -- CPU trace interface --
-  type trace_t is array (0 to num_cores_c-1) of trace_port_t;
-  signal trace_s : trace_t;
+  type cpu_trace_t is array (0 to num_cores_c-1) of trace_port_t;
+  signal cpu_trace : cpu_trace_t;
 
   -- bus: CPU core complex --
   type core_complex_req_t is array (0 to num_cores_c-1) of bus_req_t;
@@ -297,6 +302,7 @@ architecture neorv32_top_rtl of neorv32_top is
   -- bus: system --
   signal sys1_req, sys2_req, dma_req, amo_req, sys3_req, imem_req, dmem_req, io_req, xbus_req : bus_req_t;
   signal sys1_rsp, sys2_rsp, dma_rsp, amo_rsp, sys3_rsp, imem_rsp, dmem_rsp, io_rsp, xbus_rsp : bus_rsp_t;
+  signal xbus_terminate : std_ulogic;
 
   -- bus: IO devices --
   type io_devices_enum_t is (
@@ -323,22 +329,20 @@ architecture neorv32_top_rtl of neorv32_top is
 begin
 
   -- **************************************************************************************************************************
-  -- Sanity Checks
+  -- Configuration Checks
   -- **************************************************************************************************************************
 
-  sanity_checks:
+  config_checks:
   if true generate
 
     -- say hello --
     assert false report
-      "[NEORV32] The NEORV32 RISC-V Processor " &
-      "(v" &
+      "[NEORV32] The NEORV32 RISC-V Processor (v" &
       print_hex_f(hw_version_c(31 downto 24)) & "." &
       print_hex_f(hw_version_c(23 downto 16)) & "." &
-      print_hex_f(hw_version_c(15 downto 8)) & "." &
-      print_hex_f(hw_version_c(7 downto 0)) &
-      "), " &
-      "github.com/stnolting/neorv32" severity note;
+      print_hex_f(hw_version_c(15 downto 8))  & "." &
+      print_hex_f(hw_version_c(7 downto 0))   &
+      "), github.com/stnolting/neorv32" severity note;
 
     -- show SoC configuration --
     assert false report
@@ -385,31 +389,34 @@ begin
       "[NEORV32] Auto-adjusting invalid DMEM size configuration." severity warning;
 
     -- SYSINFO disabled --
-    assert not (not io_sysinfo_en_c) report
-      "[NEORV32] SYSINFO module disabled - some parts of the NEORV32 software framework will no longer work!" severity warning;
+    assert io_sysinfo_en_c report
+      "[NEORV32] SYSINFO module disabled - NEORV32 software framework will not function properly!" severity warning;
 
     -- Clock speed not defined --
-    assert not (CLOCK_FREQUENCY = 0) report
-      "[NEORV32] CLOCK_FREQUENCY must be configured according to the frequency of clk_i port." severity warning;
+    assert (CLOCK_FREQUENCY > 0) report
+      "[NEORV32] CLOCK_FREQUENCY must be configured according to the frequency of clk_i port!" severity warning;
 
     -- Boot configuration notifier --
-    assert not (BOOT_MODE_SELECT = 0) report "[NEORV32] BOOT_MODE_SELECT = 0: booting via bootloader" severity note;
-    assert not (BOOT_MODE_SELECT = 1) report "[NEORV32] BOOT_MODE_SELECT = 1: booting from custom address" severity note;
-    assert not (BOOT_MODE_SELECT = 2) report "[NEORV32] BOOT_MODE_SELECT = 2: booting IMEM image" severity note;
+    assert not (BOOT_MODE_SELECT = 0) report "[NEORV32] BOOT_MODE_SELECT 0 - booting via bootloader" severity note;
+    assert not (BOOT_MODE_SELECT = 1) report "[NEORV32] BOOT_MODE_SELECT 1 - booting from custom address" severity note;
+    assert not (BOOT_MODE_SELECT = 2) report "[NEORV32] BOOT_MODE_SELECT 2 - booting IMEM image" severity note;
 
     -- Boot configuration: boot from initialized IMEM requires the IMEM to be enabled --
     assert not ((BOOT_MODE_SELECT = 2) and (not IMEM_EN)) report
-      "[NEORV32] ERROR: BOOT_MODE_SELECT = 2 (boot IMEM image) requires the internal instruction memory (IMEM) to be enabled!" severity error;
+      "[NEORV32] BOOT_MODE_SELECT = 2 (boot IMEM image) requires the internal instruction memory (IMEM) to be enabled!" severity error;
 
     -- The SMP dual-core configuration requires the CLINT --
     assert not (DUAL_CORE_EN and (not IO_CLINT_EN)) report
-      "[NEORV32] ERROR: The SMP dual-core configuration requires the CLINT to be enabled!" severity error;
+      "[NEORV32] The SMP dual-core configuration requires the CLINT to be enabled!" severity error;
 
     -- XBUS interface might generate burst transfers --
     assert not (XBUS_EN and (ICACHE_EN or DCACHE_EN)) report
-      "[NEORV32] WARNING: XBUS will emit burst transfers for cached addresses!" severity warning;
+      "[NEORV32] XBUS will emit burst transfers for cached addresses!" severity warning;
 
-  end generate; -- /sanity_checks
+    -- simulation notifier --
+    assert not is_simulation_c report "[NEORV32] Assuming this is a simulation." severity warning;
+
+  end generate; -- /config_checks
 
 
   -- **************************************************************************************************************************
@@ -508,6 +515,8 @@ begin
       RISCV_ISA_Sdtrig    => cpu_sdtrig_en_c,
       RISCV_ISA_Smpmp     => cpu_smpmp_en_c,
       -- Tuning Options --
+      CPU_TRACE_EN        => trace_en_c,
+      CPU_CONSTT_BR_EN    => CPU_CONSTT_BR_EN,
       CPU_FAST_MUL_EN     => CPU_FAST_MUL_EN,
       CPU_FAST_SHIFT_EN   => CPU_FAST_SHIFT_EN,
       CPU_RF_HW_RST_EN    => CPU_RF_HW_RST_EN,
@@ -527,7 +536,7 @@ begin
       clk_i      => clk_i,
       rstn_i     => rstn_sys,
       -- status --
-      trace_o    => trace_s(i),
+      trace_o    => cpu_trace(i),
       sleep_o    => open,
       -- interrupts --
       msi_i      => msw_irq(i),
@@ -622,6 +631,10 @@ begin
     );
 
   end generate; -- /core_complex
+
+  -- CPU execution trace ports --
+  trace_cpu0_o <= cpu_trace(core_req'left);
+  trace_cpu1_o <= cpu_trace(core_req'right) when (num_cores_c = 2) else trace_port_terminate_c;
 
 
   -- Core Complex Bus Arbiter ---------------------------------------------------------------
@@ -768,26 +781,28 @@ begin
 
   neorv32_bus_gateway_inst: entity neorv32.neorv32_bus_gateway
   generic map (
-    TIMEOUT  => bus_timeout_c,
+    TMO_INT => int_bus_tmo_c,
+    TMO_EXT => XBUS_TIMEOUT,
     -- port A: internal IMEM --
-    A_EN   => IMEM_EN,
-    A_BASE => mem_imem_base_c,
-    A_SIZE => imem_size_c,
+    A_EN    => IMEM_EN,
+    A_BASE  => mem_imem_base_c,
+    A_SIZE  => imem_size_c,
     -- port B: internal DMEM --
-    B_EN   => DMEM_EN,
-    B_BASE => mem_dmem_base_c,
-    B_SIZE => dmem_size_c,
+    B_EN    => DMEM_EN,
+    B_BASE  => mem_dmem_base_c,
+    B_SIZE  => dmem_size_c,
     -- port C: IO --
-    C_EN   => true, -- always enabled (but will be trimmed if no IO devices are implemented)
-    C_BASE => mem_io_base_c,
-    C_SIZE => mem_io_size_c,
+    C_EN    => true,
+    C_BASE  => mem_io_base_c,
+    C_SIZE  => mem_io_size_c,
     -- port X (the void): XBUS --
-    X_EN   => XBUS_EN
+    X_EN    => XBUS_EN
   )
   port map (
     -- global control --
     clk_i   => clk_i,
     rstn_i  => rstn_sys,
+    term_o  => xbus_terminate,
     -- host port --
     req_i   => sys3_req,
     rsp_o   => sys3_rsp,
@@ -812,12 +827,12 @@ begin
 
     -- Processor-Internal Instruction Memory (IMEM) -------------------------------------------
     -- -------------------------------------------------------------------------------------------
-    neorv32_int_imem_enabled:
+    neorv32_imem_enabled:
     if IMEM_EN generate
-      neorv32_int_imem_inst: entity neorv32.neorv32_imem
+      neorv32_imem_inst: entity neorv32.neorv32_imem
       generic map (
-        IMEM_SIZE => imem_size_c,
-        IMEM_INIT => imem_as_rom_c,
+        MEM_SIZE  => imem_size_c,
+        MEM_INIT  => imem_as_rom_c,
         OUTREG_EN => IMEM_OUTREG_EN
       )
       port map (
@@ -828,7 +843,7 @@ begin
       );
     end generate;
 
-    neorv32_int_imem_disabled:
+    neorv32_imem_disabled:
     if not IMEM_EN generate
       imem_rsp <= rsp_terminate_c;
     end generate;
@@ -836,11 +851,11 @@ begin
 
     -- Processor-Internal Data Memory (DMEM) --------------------------------------------------
     -- -------------------------------------------------------------------------------------------
-    neorv32_int_dmem_enabled:
+    neorv32_dmem_enabled:
     if DMEM_EN generate
-      neorv32_int_dmem_inst: entity neorv32.neorv32_dmem
+      neorv32_dmem_inst: entity neorv32.neorv32_dmem
       generic map (
-        DMEM_SIZE => dmem_size_c,
+        MEM_SIZE  => dmem_size_c,
         OUTREG_EN => DMEM_OUTREG_EN
       )
       port map (
@@ -851,7 +866,7 @@ begin
       );
     end generate;
 
-    neorv32_int_dmem_disabled:
+    neorv32_dmem_disabled:
     if not DMEM_EN generate
       dmem_rsp <= rsp_terminate_c;
     end generate;
@@ -863,12 +878,12 @@ begin
     if XBUS_EN generate
       neorv32_xbus_inst: entity neorv32.neorv32_xbus
       generic map (
-        TIMEOUT_VAL => XBUS_TIMEOUT,
         REGSTAGE_EN => XBUS_REGSTAGE_EN
       )
       port map (
         clk_i      => clk_i,
         rstn_i     => rstn_sys,
+        bus_term_i => xbus_terminate,
         bus_req_i  => xbus_req,
         bus_rsp_o  => xbus_rsp,
         xbus_adr_o => xbus_adr_o,
@@ -1483,8 +1498,8 @@ begin
       port map (
         clk_i     => clk_i,
         rstn_i    => rstn_sys,
-        trace0_i  => trace_s(trace_s'left),
-        trace1_i  => trace_s(trace_s'right),
+        trace0_i  => cpu_trace(cpu_trace'left),
+        trace1_i  => cpu_trace(cpu_trace'right),
         bus_req_i => iodev_req(IODEV_TRACER),
         bus_rsp_o => iodev_rsp(IODEV_TRACER),
         irq_o     => firq(FIRQ_TRACER)
@@ -1504,6 +1519,8 @@ begin
     if io_sysinfo_en_c generate
       neorv32_sysinfo_inst: entity neorv32.neorv32_sysinfo
       generic map (
+        BUS_TMO_INT       => int_bus_tmo_c,
+        BUS_TMO_EXT       => XBUS_TIMEOUT,
         NUM_HARTS         => num_cores_c,
         CLOCK_FREQUENCY   => CLOCK_FREQUENCY,
         BOOT_MODE_SELECT  => BOOT_MODE_SELECT,

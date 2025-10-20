@@ -30,8 +30,7 @@ use neorv32.neorv32_package.all;
 entity neorv32_cpu_regfile is
   generic (
     RST_EN : boolean; -- implement dedicated hardware reset ("ASIC style")
-    RVE_EN : boolean; -- implement embedded RF extension
-    RS3_EN : boolean  -- implement 3rd read port
+    RVE_EN : boolean  -- implement embedded RF extension
   );
   port (
     -- global control --
@@ -39,119 +38,68 @@ entity neorv32_cpu_regfile is
     rstn_i : in  std_ulogic; -- global reset, low-active, async
     ctrl_i : in  ctrl_bus_t; -- main control bus
     -- operands --
-    rd_i   : in  std_ulogic_vector(XLEN-1 downto 0); -- destination operand rd
-    rs1_o  : out std_ulogic_vector(XLEN-1 downto 0); -- source operand rs1
-    rs2_o  : out std_ulogic_vector(XLEN-1 downto 0); -- source operand rs2
-    rs3_o  : out std_ulogic_vector(XLEN-1 downto 0)  -- source operand rs3
+    rd_i   : in  std_ulogic_vector(XLEN-1 downto 0); -- destination data rd
+    rs1_o  : out std_ulogic_vector(XLEN-1 downto 0); -- source data rs1
+    rs2_o  : out std_ulogic_vector(XLEN-1 downto 0)  -- source data rs2
   );
 end neorv32_cpu_regfile;
 
 architecture neorv32_cpu_regfile_rtl of neorv32_cpu_regfile is
 
   -- auto-configuration --
-  constant addr_bits_c : natural := cond_sel_natural_f(RVE_EN, 4, 5); -- address width
+  constant awidth_c : natural := cond_sel_natural_f(RVE_EN, 4, 5); -- address width
 
   -- register file --
-  type   reg_file_t is array ((2**addr_bits_c)-1 downto 0) of std_ulogic_vector(XLEN-1 downto 0);
+  type   reg_file_t is array (0 to (2**awidth_c)-1) of std_ulogic_vector(XLEN-1 downto 0);
   signal reg_file : reg_file_t;
 
-  -- access --
-  signal rf_we    : std_ulogic; -- write enable
-  signal rd_zero  : std_ulogic; -- writing to x0?
-  signal opa_addr : std_ulogic_vector(4 downto 0); -- rs1/rd address
-  signal rs3_addr : std_ulogic_vector(4 downto 0); -- rs3 address
-
-    -- local signals for connecting to the RAM
-    signal ram_addr_a : std_ulogic_vector(addr_bits_c-1 downto 0);
-    signal ram_addr_b : std_ulogic_vector(addr_bits_c-1 downto 0);
-    signal ram_din_a  : std_ulogic_vector(XLEN-1 downto 0);
-    signal ram_we_a   : std_ulogic;
-    signal ram_dout_a : std_ulogic_vector(XLEN-1 downto 0);
-    signal ram_dout_b : std_ulogic_vector(XLEN-1 downto 0);
-
-  -- component declaration for the explicit BRAM IP
-  component true_dual_port_ram is
-    generic (
-      DATA_WIDTH    : integer := 32;
-      ADDR_WIDTH    : integer := 5;
-      WRITE_MODE_1  : string  := "READ_FIRST";
-      WRITE_MODE_2  : string  := "READ_FIRST";
-      OUTPUT_REG_1  : string  := "TRUE";
-      OUTPUT_REG_2  : string  := "TRUE";
-      RAM_INIT_FILE : string  := ""
-    );
-    port (
-      we1   : in  std_ulogic;
-      we2   : in  std_ulogic;
-      clka  : in  std_ulogic;
-      clkb  : in  std_ulogic;
-      din1  : in  std_ulogic_vector(DATA_WIDTH-1 downto 0);
-      din2  : in  std_ulogic_vector(DATA_WIDTH-1 downto 0);
-      addr1 : in  std_ulogic_vector(ADDR_WIDTH-1 downto 0);
-      addr2 : in  std_ulogic_vector(ADDR_WIDTH-1 downto 0);
-      dout1 : out std_ulogic_vector(DATA_WIDTH-1 downto 0);
-      dout2 : out std_ulogic_vector(DATA_WIDTH-1 downto 0)
-    );
-  end component;
+  -- access logic --
+  signal rf_we, rd_zero : std_ulogic;
+  signal opa_addr : std_ulogic_vector(4 downto 0);
 
 begin
+
+  -- FPGA-Style Register File Access Logic --------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+
+  -- Register zero (x0) is a "normal" physical register that is set to zero by the CPU control
+  -- hardware. The register file uses synchronous read accesses and a *single* multiplexed
+  -- address port for writing and reading rd/rs1 and a single read-only port for reading rs2.
+  -- Therefore, the whole register file can be mapped to a single true-dual-port RAM.
+
+  rd_zero  <= '1' when (ctrl_i.rf_rd = "00000") else '0';
+  rf_we    <= (ctrl_i.rf_wb_en and (not rd_zero)) or ctrl_i.rf_zero_we; -- never write to x0 unless forced
+  opa_addr <= "00000" when (ctrl_i.rf_zero_we = '1') else -- force rd = zero
+              ctrl_i.rf_rd when (ctrl_i.rf_wb_en = '1') else -- rd
+              ctrl_i.rf_rs1; -- rs1
+
 
   -- FPGA-Style Register File (BlockRAM, no hardware reset at all) --------------------------
   -- -------------------------------------------------------------------------------------------
   register_file_fpga:
   if not RST_EN generate
-
-    -- True dual-port block RAM instantiation
-    -- Port A: write-port (rd) and read-port (rs1)
-    -- Port B: read-port (rs2)
-
-    -- control logic to drive the RAM
-    rd_zero  <= '1' when (ctrl_i.rf_rd = "00000") else '0';
-    rf_we    <= (ctrl_i.rf_wb_en and (not rd_zero)) or ctrl_i.rf_zero_we; -- never write to x0 unless explicitly forced
-    opa_addr <= "00000" when (ctrl_i.rf_zero_we = '1') else -- force rd = zero
-                ctrl_i.rf_rd when (ctrl_i.rf_wb_en = '1') else -- rd
-                ctrl_i.rf_rs1; -- rs1
-    -- ram_we_a <= (ctrl_i.rf_wb_en and (not rd_zero)) or ctrl_i.rf_zero_we; -- never write to x0 unless explicitly forced
-
-    -- Port A is used for writes (rd) and for rs1 reads
-    ram_addr_a <= ctrl_i.rf_rd(addr_bits_c-1 downto 0) when (ctrl_i.rf_wb_en = '1') else
-                  ctrl_i.rf_rs1(addr_bits_c-1 downto 0);
-    ram_din_a  <= rd_i;
-
-    -- Port B is used for rs2 reads
-    ram_addr_b <= ctrl_i.rf_rs2(addr_bits_c-1 downto 0);
-
-    -- Instantiate the true dual-port RAM
-    bram_inst : true_dual_port_ram
-      generic map (
-        DATA_WIDTH    => XLEN,
-        ADDR_WIDTH    => addr_bits_c,
-        WRITE_MODE_1  => "READ_FIRST",
-        WRITE_MODE_2  => "READ_FIRST",
-        OUTPUT_REG_1  => "FALSE",
-        OUTPUT_REG_2  => "FALSE",
-        RAM_INIT_FILE => ""
-      )
-      port map (
-        clka  => clk_i,
-        addr1 => opa_addr,
-        we1   => rf_we,
-        din1  => rd_i,
-        dout1 => rs1_o,--ram_dout_a,
-
-        din2  => (others => '0'), -- Port B is read-only
-        we2   => '0',             -- Port B is read-only
-        clkb  => clk_i,
-        addr2 => ram_addr_b,
-        dout2 => rs2_o--ram_dout_b
-      );
-
-    -- Connect RAM outputs to module outputs
-    -- Handle reading from address 0
-    -- rs1_o <= ram_dout_a when (unsigned(ram_addr_a) /= 0) else (others => '0');
-    -- rs2_o <= ram_dout_b when (unsigned(ram_addr_b) /= 0) else (others => '0');
-
-  end generate; -- /register_file_fpga
+    reg_file_inst: entity neorv32.neorv32_prim_sdpram
+    generic map (
+      AWIDTH => awidth_c,
+      DWIDTH => XLEN,
+      OUTREG => false
+    )
+    port map (
+      -- global control --
+      clk_i    => clk_i,
+      -- write port --
+      a_en_i   => '1',
+      a_rw_i   => rf_we,
+      a_addr_i => opa_addr(awidth_c-1 downto 0),
+      a_data_i => rd_i,
+      a_data_o => rs1_o,
+      -- read port --
+      b_en_i   => '1',
+      b_addr_i => ctrl_i.rf_rs2(awidth_c-1 downto 0),
+      b_data_o => rs2_o
+    );
+    reg_file <= (others => (others => '0')); -- unused
+  end generate;
 
 
   -- ASIC-Style Register File (individual FFs, full hardware reset) -------------------------
@@ -159,23 +107,23 @@ begin
   register_file_asic:
   if RST_EN generate
 
+    -- x0 is hardwired to zero --
+    reg_file(0) <= (others => '0');
+
     -- individual registers --
     reg_gen:
-    for i in 1 to (2**addr_bits_c)-1 generate
+    for i in 1 to (2**awidth_c)-1 generate
       register_file: process(rstn_i, clk_i)
       begin
         if (rstn_i = '0') then
           reg_file(i) <= (others => '0'); -- full hardware reset
         elsif rising_edge(clk_i) then
-          if (unsigned(ctrl_i.rf_rd(addr_bits_c-1 downto 0)) = to_unsigned(i, addr_bits_c)) and (ctrl_i.rf_wb_en = '1') then
+          if (unsigned(ctrl_i.rf_rd(awidth_c-1 downto 0)) = to_unsigned(i, awidth_c)) and (ctrl_i.rf_wb_en = '1') then
             reg_file(i) <= rd_i;
           end if;
         end if;
       end process register_file;
     end generate;
-
-    -- x0 is hardwired to zero --
-    reg_file(0) <= (others => '0');
 
     -- synchronous read --
     rf_read: process(rstn_i, clk_i)
@@ -184,33 +132,11 @@ begin
         rs1_o <= (others => '0');
         rs2_o <= (others => '0');
       elsif rising_edge(clk_i) then
-        rs1_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs1(addr_bits_c-1 downto 0))));
-        rs2_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs2(addr_bits_c-1 downto 0))));
+        rs1_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs1(awidth_c-1 downto 0))));
+        rs2_o <= reg_file(to_integer(unsigned(ctrl_i.rf_rs2(awidth_c-1 downto 0))));
       end if;
     end process rf_read;
 
-  end generate; -- /register_file_asic
-
-
-  -- Optional Third Read Port (rs3) ---------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  rs3_enabled:
-  if RS3_EN generate
-    rs3_read: process(clk_i)
-    begin
-      if rising_edge(clk_i) then
-        rs3_o <= reg_file(to_integer(unsigned(rs3_addr(addr_bits_c-1 downto 0))));
-      end if;
-    end process rs3_read;
   end generate;
-
-  rs3_disabled:
-  if not RS3_EN generate
-    rs3_o <= (others => '0');
-  end generate;
-
-  -- RISC-V rs3 operand --
-  rs3_addr <= ctrl_i.ir_funct12(11 downto 7);
-
 
 end neorv32_cpu_regfile_rtl;

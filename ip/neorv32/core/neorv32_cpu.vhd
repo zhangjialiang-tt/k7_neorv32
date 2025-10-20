@@ -15,6 +15,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 library neorv32;
 use neorv32.neorv32_package.all;
@@ -22,83 +23,84 @@ use neorv32.neorv32_package.all;
 entity neorv32_cpu is
   generic (
     -- General --
-    HART_ID             : natural range 0 to 1023; -- hardware thread ID
-    BOOT_ADDR           : std_ulogic_vector(31 downto 0); -- cpu boot address
-    DEBUG_PARK_ADDR     : std_ulogic_vector(31 downto 0); -- cpu debug mode parking loop entry address
-    DEBUG_EXC_ADDR      : std_ulogic_vector(31 downto 0); -- cpu debug mode exception entry address
+    HART_ID             : natural range 0 to 1023;        -- hardware thread ID
+    BOOT_ADDR           : std_ulogic_vector(31 downto 0); -- CPU boot address
+    DEBUG_PARK_ADDR     : std_ulogic_vector(31 downto 0); -- CPU debug mode parking loop entry address
+    DEBUG_EXC_ADDR      : std_ulogic_vector(31 downto 0); -- CPU debug mode exception entry address
     -- RISC-V ISA Extensions --
-    RISCV_ISA_C         : boolean; -- implement compressed extension
-    RISCV_ISA_E         : boolean; -- implement embedded RF extension
-    RISCV_ISA_M         : boolean; -- implement mul/div extension
-    RISCV_ISA_U         : boolean; -- implement user mode extension
-    RISCV_ISA_Zaamo     : boolean; -- implement atomic read-modify-write operations extension
-    RISCV_ISA_Zalrsc    : boolean; -- implement atomic reservation-set operations extension
-    RISCV_ISA_Zcb       : boolean; -- implement additional code size reduction instructions
-    RISCV_ISA_Zba       : boolean; -- implement shifted-add bit-manipulation extension
-    RISCV_ISA_Zbb       : boolean; -- implement basic bit-manipulation extension
-    RISCV_ISA_Zbkb      : boolean; -- implement bit-manipulation instructions for cryptography
-    RISCV_ISA_Zbkc      : boolean; -- implement carry-less multiplication instructions
-    RISCV_ISA_Zbkx      : boolean; -- implement cryptography crossbar permutation extension
-    RISCV_ISA_Zbs       : boolean; -- implement single-bit bit-manipulation extension
-    RISCV_ISA_Zfinx     : boolean; -- implement 32-bit floating-point extension
-    RISCV_ISA_Zicntr    : boolean; -- implement base counters
-    RISCV_ISA_Zicond    : boolean; -- implement integer conditional operations
-    RISCV_ISA_Zihpm     : boolean; -- implement hardware performance monitors
-    RISCV_ISA_Zknd      : boolean; -- implement cryptography NIST AES decryption extension
-    RISCV_ISA_Zkne      : boolean; -- implement cryptography NIST AES encryption extension
-    RISCV_ISA_Zknh      : boolean; -- implement cryptography NIST hash extension
-    RISCV_ISA_Zksed     : boolean; -- implement ShangMi hash extension
-    RISCV_ISA_Zksh      : boolean; -- implement ShangMi block cipher extension
-    RISCV_ISA_Zmmul     : boolean; -- implement multiply-only M sub-extension
-    RISCV_ISA_Zxcfu     : boolean; -- implement custom (instr.) functions unit
-    RISCV_ISA_Sdext     : boolean; -- implement external debug mode extension
-    RISCV_ISA_Sdtrig    : boolean; -- implement trigger module extension
-    RISCV_ISA_Smpmp     : boolean; -- implement physical memory protection
+    RISCV_ISA_C         : boolean;                        -- implement compressed extension
+    RISCV_ISA_E         : boolean;                        -- implement embedded RF extension
+    RISCV_ISA_M         : boolean;                        -- implement mul/div extension
+    RISCV_ISA_U         : boolean;                        -- implement user mode extension
+    RISCV_ISA_Zaamo     : boolean;                        -- implement atomic read-modify-write operations extension
+    RISCV_ISA_Zalrsc    : boolean;                        -- implement atomic reservation-set operations extension
+    RISCV_ISA_Zcb       : boolean;                        -- implement additional code size reduction instructions
+    RISCV_ISA_Zba       : boolean;                        -- implement shifted-add bit-manipulation extension
+    RISCV_ISA_Zbb       : boolean;                        -- implement basic bit-manipulation extension
+    RISCV_ISA_Zbkb      : boolean;                        -- implement bit-manipulation instructions for cryptography
+    RISCV_ISA_Zbkc      : boolean;                        -- implement carry-less multiplication instructions
+    RISCV_ISA_Zbkx      : boolean;                        -- implement cryptography crossbar permutation extension
+    RISCV_ISA_Zbs       : boolean;                        -- implement single-bit bit-manipulation extension
+    RISCV_ISA_Zfinx     : boolean;                        -- implement 32-bit floating-point extension
+    RISCV_ISA_Zicntr    : boolean;                        -- implement base counters
+    RISCV_ISA_Zicond    : boolean;                        -- implement integer conditional operations
+    RISCV_ISA_Zihpm     : boolean;                        -- implement hardware performance monitors
+    RISCV_ISA_Zknd      : boolean;                        -- implement cryptography NIST AES decryption extension
+    RISCV_ISA_Zkne      : boolean;                        -- implement cryptography NIST AES encryption extension
+    RISCV_ISA_Zknh      : boolean;                        -- implement cryptography NIST hash extension
+    RISCV_ISA_Zksed     : boolean;                        -- implement ShangMi hash extension
+    RISCV_ISA_Zksh      : boolean;                        -- implement ShangMi block cipher extension
+    RISCV_ISA_Zmmul     : boolean;                        -- implement multiply-only M sub-extension
+    RISCV_ISA_Zxcfu     : boolean;                        -- implement custom (instr.) functions unit
+    RISCV_ISA_Sdext     : boolean;                        -- implement external debug mode extension
+    RISCV_ISA_Sdtrig    : boolean;                        -- implement trigger module extension
+    RISCV_ISA_Smpmp     : boolean;                        -- implement physical memory protection
     -- Tuning Options --
-    CPU_FAST_MUL_EN     : boolean; -- use DSPs for M extension's multiplier
-    CPU_FAST_SHIFT_EN   : boolean; -- use barrel shifter for shift operations
-    CPU_RF_HW_RST_EN    : boolean; -- implement full hardware reset for register file
+    CPU_TRACE_EN        : boolean;                        -- implement CPU execution trace generator
+    CPU_CONSTT_BR_EN    : boolean;                        -- implement constant-time branches
+    CPU_FAST_MUL_EN     : boolean;                        -- use DSPs for M extension's multiplier
+    CPU_FAST_SHIFT_EN   : boolean;                        -- use barrel shifter for shift operations
+    CPU_RF_HW_RST_EN    : boolean;                        -- implement full hardware reset for register file
     -- Physical Memory Protection (PMP) --
-    PMP_NUM_REGIONS     : natural range 0 to 16; -- number of regions (0..16)
-    PMP_MIN_GRANULARITY : natural; -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
-    PMP_TOR_MODE_EN     : boolean; -- implement TOR mode
-    PMP_NAP_MODE_EN     : boolean; -- implement NAPOT/NA4 modes
+    PMP_NUM_REGIONS     : natural range 0 to 16;          -- number of regions (0..16)
+    PMP_MIN_GRANULARITY : natural;                        -- minimal region granularity in bytes, has to be a power of 2, min 4 bytes
+    PMP_TOR_MODE_EN     : boolean;                        -- implement TOR mode
+    PMP_NAP_MODE_EN     : boolean;                        -- implement NAPOT/NA4 modes
     -- Hardware Performance Monitors (HPM) --
-    HPM_NUM_CNTS        : natural range 0 to 13; -- number of implemented HPM counters (0..13)
-    HPM_CNT_WIDTH       : natural range 0 to 64; -- total size of HPM counters (0..64)
+    HPM_NUM_CNTS        : natural range 0 to 13;          -- number of implemented HPM counters (0..13)
+    HPM_CNT_WIDTH       : natural range 0 to 64;          -- total size of HPM counters (0..64)
     -- Trigger Module (TM) --
-    NUM_HW_TRIGGERS     : natural range 0 to 16 -- number of hardware triggers
+    NUM_HW_TRIGGERS     : natural range 0 to 16           -- number of hardware triggers
   );
   port (
     -- global control --
-    clk_i      : in  std_ulogic; -- global clock, rising edge
-    rstn_i     : in  std_ulogic; -- global reset, low-active, async
+    clk_i      : in  std_ulogic;                     -- global clock, rising edge
+    rstn_i     : in  std_ulogic;                     -- global reset, low-active, async
     -- status --
-    trace_o    : out trace_port_t; -- execution trace port
-    sleep_o    : out std_ulogic; -- CPU is in sleep mode
+    trace_o    : out trace_port_t;                   -- execution trace port (enabled when CPU_TRACE_EN = true)
+    sleep_o    : out std_ulogic;                     -- CPU is in sleep mode
     -- interrupts --
-    msi_i      : in  std_ulogic; -- risc-v machine software interrupt
-    mei_i      : in  std_ulogic; -- risc-v machine external interrupt
-    mti_i      : in  std_ulogic; -- risc-v machine timer interrupt
+    msi_i      : in  std_ulogic;                     -- RISC-V machine software interrupt
+    mei_i      : in  std_ulogic;                     -- RISC-V machine external interrupt
+    mti_i      : in  std_ulogic;                     -- RISC-V machine timer interrupt
     firq_i     : in  std_ulogic_vector(15 downto 0); -- custom fast interrupts
-    dbi_i      : in  std_ulogic; -- risc-v debug halt request interrupt
+    dbi_i      : in  std_ulogic;                     -- RISC-V debug halt request interrupt
     -- instruction bus interface --
-    ibus_req_o : out bus_req_t; -- request bus
-    ibus_rsp_i : in  bus_rsp_t; -- response bus
+    ibus_req_o : out bus_req_t;                      -- request bus
+    ibus_rsp_i : in  bus_rsp_t;                      -- response bus
     -- data bus interface --
-    dbus_req_o : out bus_req_t; -- request bus
-    dbus_rsp_i : in  bus_rsp_t  -- response bus
+    dbus_req_o : out bus_req_t;                      -- request bus
+    dbus_rsp_i : in  bus_rsp_t                       -- response bus
   );
 end neorv32_cpu;
 
 architecture neorv32_cpu_rtl of neorv32_cpu is
 
   -- auto-configuration --
-  constant rf_rs3_en_c : boolean := RISCV_ISA_Zxcfu or RISCV_ISA_Zfinx; -- 3rd register file read port
   constant riscv_a_c   : boolean := RISCV_ISA_Zaamo and RISCV_ISA_Zalrsc; -- A: atomic memory operations
   constant riscv_b_c   : boolean := RISCV_ISA_Zba and RISCV_ISA_Zbb and RISCV_ISA_Zbs; -- B: bit manipulation
   constant riscv_zcb_c : boolean := RISCV_ISA_C and RISCV_ISA_Zcb; -- Zcb: additional compressed instructions
-  constant riscv_zkt_c : boolean := CPU_FAST_SHIFT_EN; -- Zkt: data-independent execution time for cryptographic operations
+  constant riscv_zkt_c : boolean := CPU_FAST_SHIFT_EN; -- Zkt: data-independent execution time for cryptography operations
   constant riscv_zkn_c : boolean := RISCV_ISA_Zbkb and RISCV_ISA_Zbkc and RISCV_ISA_Zbkx and
                                     RISCV_ISA_Zkne and RISCV_ISA_Zknd and RISCV_ISA_Zknh; -- Zkn: NIST suite
   constant riscv_zks_c : boolean := RISCV_ISA_Zbkb and RISCV_ISA_Zbkc and RISCV_ISA_Zbkx and
@@ -114,22 +116,23 @@ architecture neorv32_cpu_rtl of neorv32_cpu is
   signal rf_wdata    : std_ulogic_vector(XLEN-1 downto 0); -- register file write data
   signal rs1         : std_ulogic_vector(XLEN-1 downto 0); -- source register 1
   signal rs2         : std_ulogic_vector(XLEN-1 downto 0); -- source register 2
-  signal rs3         : std_ulogic_vector(XLEN-1 downto 0); -- source register 3
   signal alu_res     : std_ulogic_vector(XLEN-1 downto 0); -- alu result
   signal alu_add     : std_ulogic_vector(XLEN-1 downto 0); -- alu address result
   signal alu_cmp     : std_ulogic_vector(1 downto 0);      -- comparator result
-  signal lsu_rdata   : std_ulogic_vector(XLEN-1 downto 0); -- lsu memory read data
   signal alu_cp_done : std_ulogic;                         -- alu co-processor operation done
-  signal lsu_wait    : std_ulogic;                         -- wait for current data bus access
-  signal csr_rdata   : std_ulogic_vector(XLEN-1 downto 0); -- csr read data
+  signal lsu_rdata   : std_ulogic_vector(XLEN-1 downto 0); -- lsu memory read data
   signal lsu_mar     : std_ulogic_vector(XLEN-1 downto 0); -- lsu memory address register
   signal lsu_err     : std_ulogic_vector(3 downto 0);      -- lsu alignment/access errors
+  signal lsu_wait    : std_ulogic;                         -- wait for current data bus access
+  signal dbus_req    : bus_req_t;                          -- data bus request
+  signal csr_rdata   : std_ulogic_vector(XLEN-1 downto 0); -- csr read data
   signal pmp_fault   : std_ulogic;                         -- pmp permission violation
+  signal pmp_daddr   : std_ulogic_vector(XLEN-1 downto 0); -- data address for PMP check (shortcut)
   signal irq_machine : std_ulogic_vector(2 downto 0);      -- risc-v standard machine-level interrupts
 
 begin
 
-  -- Configuration Info and Sanity Checks ---------------------------------------------------
+  -- Configuration Info and Checks ----------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   hello_neorv32:
   if HART_ID = 0 generate -- print only for core 0
@@ -145,7 +148,7 @@ begin
       cond_sel_string_f(true,             "x",         "" ) & -- always enabled
       cond_sel_string_f(RISCV_ISA_Zaamo,  "_zaamo",    "" ) &
       cond_sel_string_f(RISCV_ISA_Zalrsc, "_zalrsc",   "" ) &
-      cond_sel_string_f(riscv_zcb_c,      "_zca",      "" ) & -- Zcb requires Zca in the ISA string
+      cond_sel_string_f(RISCV_ISA_C,      "_zca",      "" ) & -- Zcb requires Zca (=C) in the ISA string
       cond_sel_string_f(riscv_zcb_c,      "_zcb",      "" ) &
       cond_sel_string_f(RISCV_ISA_Zba,    "_zba",      "" ) &
       cond_sel_string_f(RISCV_ISA_Zbb,    "_zbb",      "" ) &
@@ -176,15 +179,14 @@ begin
 
     -- CPU tuning options --
     assert false report "[NEORV32] CPU tuning options: " &
+      cond_sel_string_f(CPU_TRACE_EN,      "trace ",      "") &
+      cond_sel_string_f(CPU_CONSTT_BR_EN,  "constt_br ",  "") &
       cond_sel_string_f(CPU_FAST_MUL_EN,   "fast_mul ",   "") &
       cond_sel_string_f(CPU_FAST_SHIFT_EN, "fast_shift ", "") &
       cond_sel_string_f(CPU_RF_HW_RST_EN,  "rf_hw_rst ",  "")
       severity note;
 
-    -- simulation notifier --
-    assert not is_simulation_c report "[NEORV32] Assuming this is a simulation." severity warning;
-
-  end generate; -- /hello_neorv32
+  end generate;
 
 
   -- Front-End (Instruction Fetch) ----------------------------------------------------------
@@ -212,47 +214,49 @@ begin
   neorv32_cpu_control_inst: entity neorv32.neorv32_cpu_control
   generic map (
     -- General --
-    HART_ID           => HART_ID,             -- hardware thread ID
-    BOOT_ADDR         => BOOT_ADDR,           -- cpu boot address
-    DEBUG_PARK_ADDR   => DEBUG_PARK_ADDR,     -- cpu debug mode parking loop entry address
-    DEBUG_EXC_ADDR    => DEBUG_EXC_ADDR,      -- cpu debug mode exception entry address
+    HART_ID           => HART_ID,           -- hardware thread ID
+    BOOT_ADDR         => BOOT_ADDR,         -- cpu boot address
+    DEBUG_PARK_ADDR   => DEBUG_PARK_ADDR,   -- cpu debug mode parking loop entry address
+    DEBUG_EXC_ADDR    => DEBUG_EXC_ADDR,    -- cpu debug mode exception entry address
     -- RISC-V ISA Extensions --
-    RISCV_ISA_A       => riscv_a_c,           -- implement atomic memory operations extension
-    RISCV_ISA_B       => riscv_b_c,           -- implement bit-manipulation extension
-    RISCV_ISA_C       => RISCV_ISA_C,         -- implement compressed extension
-    RISCV_ISA_E       => RISCV_ISA_E,         -- implement embedded RF extension
-    RISCV_ISA_M       => RISCV_ISA_M,         -- implement mul/div extension
-    RISCV_ISA_U       => RISCV_ISA_U,         -- implement user mode extension
-    RISCV_ISA_Zaamo   => RISCV_ISA_Zaamo,     -- implement atomic read-modify-write operations extension
-    RISCV_ISA_Zalrsc  => RISCV_ISA_Zalrsc,    -- implement atomic reservation-set operations extension
-    RISCV_ISA_Zcb     => riscv_zcb_c,         -- implement additional code size reduction instructions
-    RISCV_ISA_Zba     => RISCV_ISA_Zba,       -- implement shifted-add bit-manipulation extension
-    RISCV_ISA_Zbb     => RISCV_ISA_Zbb,       -- implement basic bit-manipulation extension
-    RISCV_ISA_Zbkb    => RISCV_ISA_Zbkb,      -- implement bit-manipulation instructions for cryptography
-    RISCV_ISA_Zbkc    => RISCV_ISA_Zbkc,      -- implement carry-less multiplication instructions
-    RISCV_ISA_Zbkx    => RISCV_ISA_Zbkx,      -- implement cryptography crossbar permutation extension
-    RISCV_ISA_Zbs     => RISCV_ISA_Zbs,       -- implement single-bit bit-manipulation extension
-    RISCV_ISA_Zfinx   => RISCV_ISA_Zfinx,     -- implement 32-bit floating-point extension
-    RISCV_ISA_Zicntr  => RISCV_ISA_Zicntr,    -- implement base counters
-    RISCV_ISA_Zicond  => RISCV_ISA_Zicond,    -- implement integer conditional operations
-    RISCV_ISA_Zihpm   => RISCV_ISA_Zihpm,     -- implement hardware performance monitors
-    RISCV_ISA_Zkn     => riscv_zkn_c,         -- NIST algorithm suite available
-    RISCV_ISA_Zknd    => RISCV_ISA_Zknd,      -- implement cryptography NIST AES decryption extension
-    RISCV_ISA_Zkne    => RISCV_ISA_Zkne,      -- implement cryptography NIST AES encryption extension
-    RISCV_ISA_Zknh    => RISCV_ISA_Zknh,      -- implement cryptography NIST hash extension
-    RISCV_ISA_Zks     => riscv_zks_c,         -- ShangMi algorithm suite available
-    RISCV_ISA_Zksed   => RISCV_ISA_Zksed,     -- implement ShangMi block cipher extension
-    RISCV_ISA_Zksh    => RISCV_ISA_Zksh,      -- implement ShangMi hash extension
-    RISCV_ISA_Zkt     => riscv_zkt_c,         -- data-independent execution time available (for cryptographic operations)
-    RISCV_ISA_Zmmul   => RISCV_ISA_Zmmul,     -- implement multiply-only M sub-extension
-    RISCV_ISA_Zxcfu   => RISCV_ISA_Zxcfu,     -- implement custom (instr.) functions unit
-    RISCV_ISA_Sdext   => RISCV_ISA_Sdext,     -- implement external debug mode extension
-    RISCV_ISA_Sdtrig  => RISCV_ISA_Sdtrig,    -- implement trigger module extension
-    RISCV_ISA_Smpmp   => RISCV_ISA_Smpmp,     -- implement physical memory protection
+    RISCV_ISA_A       => riscv_a_c,         -- implement atomic memory operations extension
+    RISCV_ISA_B       => riscv_b_c,         -- implement bit-manipulation extension
+    RISCV_ISA_C       => RISCV_ISA_C,       -- implement compressed extension
+    RISCV_ISA_E       => RISCV_ISA_E,       -- implement embedded RF extension
+    RISCV_ISA_M       => RISCV_ISA_M,       -- implement mul/div extension
+    RISCV_ISA_U       => RISCV_ISA_U,       -- implement user mode extension
+    RISCV_ISA_Zaamo   => RISCV_ISA_Zaamo,   -- implement atomic read-modify-write operations extension
+    RISCV_ISA_Zalrsc  => RISCV_ISA_Zalrsc,  -- implement atomic reservation-set operations extension
+    RISCV_ISA_Zcb     => riscv_zcb_c,       -- implement additional code size reduction instructions
+    RISCV_ISA_Zba     => RISCV_ISA_Zba,     -- implement shifted-add bit-manipulation extension
+    RISCV_ISA_Zbb     => RISCV_ISA_Zbb,     -- implement basic bit-manipulation extension
+    RISCV_ISA_Zbkb    => RISCV_ISA_Zbkb,    -- implement bit-manipulation instructions for cryptography
+    RISCV_ISA_Zbkc    => RISCV_ISA_Zbkc,    -- implement carry-less multiplication instructions
+    RISCV_ISA_Zbkx    => RISCV_ISA_Zbkx,    -- implement cryptography crossbar permutation extension
+    RISCV_ISA_Zbs     => RISCV_ISA_Zbs,     -- implement single-bit bit-manipulation extension
+    RISCV_ISA_Zfinx   => RISCV_ISA_Zfinx,   -- implement 32-bit floating-point extension
+    RISCV_ISA_Zicntr  => RISCV_ISA_Zicntr,  -- implement base counters
+    RISCV_ISA_Zicond  => RISCV_ISA_Zicond,  -- implement integer conditional operations
+    RISCV_ISA_Zihpm   => RISCV_ISA_Zihpm,   -- implement hardware performance monitors
+    RISCV_ISA_Zkn     => riscv_zkn_c,       -- NIST algorithm suite available
+    RISCV_ISA_Zknd    => RISCV_ISA_Zknd,    -- implement cryptography NIST AES decryption extension
+    RISCV_ISA_Zkne    => RISCV_ISA_Zkne,    -- implement cryptography NIST AES encryption extension
+    RISCV_ISA_Zknh    => RISCV_ISA_Zknh,    -- implement cryptography NIST hash extension
+    RISCV_ISA_Zks     => riscv_zks_c,       -- ShangMi algorithm suite available
+    RISCV_ISA_Zksed   => RISCV_ISA_Zksed,   -- implement ShangMi block cipher extension
+    RISCV_ISA_Zksh    => RISCV_ISA_Zksh,    -- implement ShangMi hash extension
+    RISCV_ISA_Zkt     => riscv_zkt_c,       -- data-independent execution time for cryptography operations available
+    RISCV_ISA_Zmmul   => RISCV_ISA_Zmmul,   -- implement multiply-only M sub-extension
+    RISCV_ISA_Zxcfu   => RISCV_ISA_Zxcfu,   -- implement custom (instr.) functions unit
+    RISCV_ISA_Sdext   => RISCV_ISA_Sdext,   -- implement external debug mode extension
+    RISCV_ISA_Sdtrig  => RISCV_ISA_Sdtrig,  -- implement trigger module extension
+    RISCV_ISA_Smpmp   => RISCV_ISA_Smpmp,   -- implement physical memory protection
     -- Tuning Options --
-    CPU_FAST_MUL_EN   => CPU_FAST_MUL_EN,     -- use DSPs for M extension's multiplier
-    CPU_FAST_SHIFT_EN => CPU_FAST_SHIFT_EN,   -- use barrel shifter for shift operations
-    CPU_RF_HW_RST_EN  => CPU_RF_HW_RST_EN     -- implement full hardware reset for register file
+    CPU_TRACE_EN      => CPU_TRACE_EN,      -- implement CPU execution trace generator
+    CPU_CONSTT_BR_EN  => CPU_CONSTT_BR_EN,  -- implement constant-time branches
+    CPU_FAST_MUL_EN   => CPU_FAST_MUL_EN,   -- use DSPs for M extension's multiplier
+    CPU_FAST_SHIFT_EN => CPU_FAST_SHIFT_EN, -- use barrel shifter for shift operations
+    CPU_RF_HW_RST_EN  => CPU_RF_HW_RST_EN   -- implement full hardware reset for register file
   )
   port map (
     -- global control --
@@ -351,8 +355,7 @@ begin
   neorv32_cpu_regfile_inst: entity neorv32.neorv32_cpu_regfile
   generic map (
     RST_EN => CPU_RF_HW_RST_EN, -- enable dedicated hardware reset ("ASIC style")
-    RVE_EN => RISCV_ISA_E,      -- implement embedded RF extension
-    RS3_EN => rf_rs3_en_c       -- enable 3rd read port
+    RVE_EN => RISCV_ISA_E       -- implement embedded RF extension
   )
   port map (
     -- global control --
@@ -362,8 +365,7 @@ begin
     -- operands --
     rd_i   => rf_wdata, -- destination operand rd
     rs1_o  => rs1,      -- source operand rs1
-    rs2_o  => rs2,      -- source operand rs2
-    rs3_o  => rs3       -- source operand rs3
+    rs2_o  => rs2       -- source operand rs2
   );
 
   -- all buses are zero unless there is an according operation --
@@ -387,7 +389,7 @@ begin
     RISCV_ISA_Zknd   => RISCV_ISA_Zknd,   -- implement cryptography NIST AES decryption extension
     RISCV_ISA_Zkne   => RISCV_ISA_Zkne,   -- implement cryptography NIST AES encryption extension
     RISCV_ISA_Zknh   => RISCV_ISA_Zknh,   -- implement cryptography NIST hash extension
-    RISCV_ISA_Zksed  => RISCV_ISA_Zksed,  -- implement ShangMi block cypher extension
+    RISCV_ISA_Zksed  => RISCV_ISA_Zksed,  -- implement ShangMi block cipher extension
     RISCV_ISA_Zksh   => RISCV_ISA_Zksh,   -- implement ShangMi hash extension
     RISCV_ISA_Zmmul  => RISCV_ISA_Zmmul,  -- implement multiply-only M sub-extension
     RISCV_ISA_Zxcfu  => RISCV_ISA_Zxcfu,  -- implement custom (instr.) functions unit
@@ -403,7 +405,6 @@ begin
     -- data input --
     rs1_i  => rs1,        -- rf source 1
     rs2_i  => rs2,        -- rf source 2
-    rs3_i  => rs3,        -- rf source 3
     -- data output --
     cmp_o  => alu_cmp,    -- comparator status
     res_o  => alu_res,    -- ALU result
@@ -419,21 +420,24 @@ begin
   neorv32_cpu_lsu_inst: entity neorv32.neorv32_cpu_lsu
   port map (
     -- global control --
-    clk_i       => clk_i,      -- global clock, rising edge
-    rstn_i      => rstn_i,     -- global reset, low-active, async
-    ctrl_i      => ctrl,       -- main control bus
+    clk_i       => clk_i,     -- global clock, rising edge
+    rstn_i      => rstn_i,    -- global reset, low-active, async
+    ctrl_i      => ctrl,      -- main control bus
     -- cpu data access interface --
-    addr_i      => alu_add,    -- access address
-    wdata_i     => rs2,        -- write data
-    rdata_o     => lsu_rdata,  -- read data
-    mar_o       => lsu_mar,    -- memory address register
-    wait_o      => lsu_wait,   -- wait for access to complete
-    err_o       => lsu_err,    -- alignment/access errors
-    pmp_fault_i => pmp_fault,  -- PMP read/write access fault
+    addr_i      => alu_add,   -- access address
+    wdata_i     => rs2,       -- write data
+    rdata_o     => lsu_rdata, -- read data
+    mar_o       => lsu_mar,   -- memory address register
+    wait_o      => lsu_wait,  -- wait for access to complete
+    err_o       => lsu_err,   -- alignment/access errors
+    pmp_fault_i => pmp_fault, -- PMP read/write access fault
     -- data bus --
-    dbus_req_o  => dbus_req_o, -- request
-    dbus_rsp_i  => dbus_rsp_i  -- response
+    dbus_req_o  => dbus_req,  -- request
+    dbus_rsp_i  => dbus_rsp_i -- response
   );
+
+  -- memory request --
+  dbus_req_o <= dbus_req;
 
 
   -- Physical Memory Protection (PMP) -------------------------------------------------------
@@ -449,34 +453,54 @@ begin
     )
     port map (
       -- global control --
-      clk_i     => clk_i,    -- global clock, rising edge
-      rstn_i    => rstn_i,   -- global reset, low-active, async
-      ctrl_i    => ctrl,     -- main control bus
+      clk_i     => clk_i,     -- global clock, rising edge
+      rstn_i    => rstn_i,    -- global reset, low-active, async
+      ctrl_i    => ctrl,      -- main control bus
       -- CSR interface --
-      csr_o     => xcsr_pmp, -- read data
+      csr_o     => xcsr_pmp,  -- read data
       -- address input --
-      addr_ls_i => alu_add,  -- load/store address
+      addr_ls_i => pmp_daddr, -- load/store address
       -- access error --
-      fault_o   => pmp_fault -- permission violation
+      fault_o   => pmp_fault  -- permission violation
     );
+    -- data access address - extra adder (so we do NOT have to use "alu_add") to improve timing --
+    pmp_daddr <= std_ulogic_vector(unsigned(rs1) + unsigned(ctrl.alu_imm));
   end generate;
 
   pmp_disabled:
   if not RISCV_ISA_Smpmp generate
     xcsr_pmp  <= (others => '0');
+    pmp_daddr <= (others => '0');
     pmp_fault <= '0';
   end generate;
 
 
-  -- Trace Port -----------------------------------------------------------------------------
+  -- Trace Generator ------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  trace_o.valid <= ctrl.cnt_event(cnt_event_ir_c);
-  trace_o.pc    <= ctrl.pc_cur(XLEN-1 downto 1) & '0';
-  trace_o.inst  <= ctrl.ir_funct12 & ctrl.rf_rs1 & ctrl.ir_funct3 & ctrl.rf_rd & ctrl.ir_opcode;
-  trace_o.rvc   <= ctrl.cnt_event(cnt_event_compr_c);
-  trace_o.mode  <= ctrl.cpu_debug & ctrl.cpu_priv;
-  trace_o.delta <= ctrl.cnt_event(cnt_event_branched_c);
-  trace_o.trap  <= ctrl.cpu_trap;
+  trace_enabled:
+  if CPU_TRACE_EN generate
+    neorv32_cpu_trace_inst: entity neorv32.neorv32_cpu_trace
+    port map (
+      -- global control --
+      clk_i       => clk_i,         -- global clock, rising edge
+      rstn_i      => rstn_i,        -- global reset, low-active, async
+      ctrl_i      => ctrl,          -- main control bus
+      -- operands --
+      rs1_rdata_i => rs1,           -- rs1 read data
+      rs2_rdata_i => rs2,           -- rs2 read data
+      rd_wdata_i  => rf_wdata,      -- rd write data
+      mem_ben_i   => dbus_req.ben,  -- memory byte-enable
+      mem_addr_i  => dbus_req.addr, -- memory address
+      mem_wdata_i => dbus_req.data, -- memory write data
+      -- trace port --
+      trace_o     => trace_o        -- execution trace port
+    );
+  end generate;
+
+  trace_disabled:
+  if not CPU_TRACE_EN generate
+    trace_o <= trace_port_terminate_c;
+  end generate;
 
 
 end neorv32_cpu_rtl;

@@ -34,7 +34,6 @@ architecture neorv32_dma_rtl of neorv32_dma is
 
   -- FIFO size helper --
   constant log2_fifo_size_c : natural := index_size_f(DSC_FIFO); -- extend to next power of two
-  constant fifo_size_c      : natural := 2**log2_fifo_size_c; -- actual FIFO size
 
   -- transfer configuration (part of the descriptor) --
   constant conf_num_lo_c : natural :=  0; -- r/w: number of elements to transfer, LSB
@@ -57,6 +56,25 @@ architecture neorv32_dma_rtl of neorv32_dma is
   constant ctrl_done_c   : natural := 30; -- r/-: transfer has completed
   constant ctrl_busy_c   : natural := 31; -- r/-: DMA transfer in progress
 
+  -- replicate byte 4 times --
+  function rep4_f(b : std_ulogic_vector(7 downto 0)) return std_ulogic_vector is
+  begin
+    return b & b & b & b;
+  end function rep4_f;
+
+  -- one-hot encoding --
+  function onehot_f(sel : std_ulogic_vector(1 downto 0)) return std_ulogic_vector is
+    variable res_v : std_ulogic_vector(3 downto 0);
+  begin
+    case sel is
+      when "00"    => res_v := "0001";
+      when "01"    => res_v := "0010";
+      when "10"    => res_v := "0100";
+      when others  => res_v := "1000";
+    end case;
+    return res_v;
+  end function onehot_f;
+
   -- control and status register --
   type ctrl_t is record
     enable, start, err, done : std_ulogic;
@@ -75,7 +93,7 @@ architecture neorv32_dma_rtl of neorv32_dma is
   signal fifo : fifo_t;
 
   -- bus access engine --
-  type state_t is (S_CHECK, S_GET_0, S_GET_1, S_GET_2, S_READ_REQ, S_READ_RSP, S_WRITE_REQ, S_WRITE_RSP);
+  type state_t is (S_CHECK, S_GET_0, S_GET_1, S_GET_2, S_GET_3, S_READ_REQ, S_READ_RSP, S_WRITE_REQ, S_WRITE_RSP);
   type engine_t is record
     state    : state_t;
     run      : std_ulogic;
@@ -92,10 +110,10 @@ architecture neorv32_dma_rtl of neorv32_dma is
   signal engine : engine_t;
 
   -- address increment --
-  signal src_add, dst_add  : unsigned(31 downto 0);
+  signal src_add, dst_add : unsigned(31 downto 0);
 
   -- data buffer --
-  signal rdata, data_buf : std_ulogic_vector(31 downto 0);
+  signal data_buf : std_ulogic_vector(31 downto 0);
 
 begin
 
@@ -146,22 +164,17 @@ begin
 
   -- Descriptor Buffer (FIFO) ---------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  descriptor_buffer: entity neorv32.neorv32_fifo
+  descriptor_buffer: entity neorv32.neorv32_prim_fifo
   generic map (
-    FIFO_DEPTH => fifo_size_c,
-    FIFO_WIDTH => 32,
-    FIFO_RSYNC => false,
-    FIFO_SAFE  => true,
-    FULL_RESET => false,
-    OUT_GATE   => false
+    AWIDTH  => log2_fifo_size_c,
+    DWIDTH  => 32,
+    OUTGATE => false
   )
   port map (
-    -- control and status --
+    -- global control --
     clk_i   => clk_i,
     rstn_i  => rstn_i,
     clear_i => fifo.clr,
-    half_o  => open,
-    level_o => open,
     -- write port --
     wdata_i => bus_req_i.data,
     we_i    => fifo.we,
@@ -208,7 +221,7 @@ begin
               engine.state <= S_GET_0;
             end if;
           else -- transfer in progress
-            if (fifo.avail = '1') and (engine.err = '0') and (ctrl.err = '0') then -- execute next descriptor if there was no error
+            if (fifo.avail = '1') and (engine.err = '0') and (ctrl.err = '0') then -- next descriptor?
               engine.run   <= '1';
               engine.state <= S_GET_0;
             else
@@ -217,29 +230,31 @@ begin
             end if;
           end if;
 
-        when S_GET_0 => -- get descriptor: source base address
+        when S_GET_0 => -- delay cycle for synchronous descriptor read
+        -- ------------------------------------------------------------
+          engine.state <= S_GET_1;
+
+        when S_GET_1 => -- get descriptor: source base address
         -- ------------------------------------------------------------
           engine.src_addr <= fifo.rdata;
-          if (fifo.avail = '1') then
-            engine.state <= S_GET_1;
-          end if;
-
-        when S_GET_1 => -- get descriptor: destination base address
-        -- ------------------------------------------------------------
-          engine.dst_addr <= fifo.rdata;
           if (fifo.avail = '1') then
             engine.state <= S_GET_2;
           end if;
 
-        when S_GET_2 => -- get descriptor: transfer configuration
+        when S_GET_2 => -- get descriptor: destination base address
+        -- ------------------------------------------------------------
+          engine.dst_addr <= fifo.rdata;
+          if (fifo.avail = '1') then
+            engine.state <= S_GET_3;
+          end if;
+
+        when S_GET_3 => -- get descriptor: transfer configuration
         -- ------------------------------------------------------------
           engine.num      <= fifo.rdata(conf_num_hi_c downto conf_num_lo_c);
           engine.bswap    <= fifo.rdata(conf_bswap_c);
           engine.src_type <= fifo.rdata(conf_src_hi_c downto conf_src_lo_c);
           engine.dst_type <= fifo.rdata(conf_dst_hi_c downto conf_dst_lo_c);
-          if (fifo.avail = '1') then
-            engine.state <= S_READ_REQ;
-          end if;
+          engine.state    <= S_READ_REQ;
 
         when S_READ_REQ => -- read request
         -- ------------------------------------------------------------
@@ -305,48 +320,6 @@ begin
   end process address_inc;
 
 
-  -- Bus Output Control ---------------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  bus_control: process(engine, data_buf)
-  begin
-    dma_req_o <= req_terminate_c; -- all-zero by default
-    -- meta data --
-    dma_req_o.priv  <= priv_mode_m_c; -- transfers execute with highest privilege level
-    dma_req_o.src   <= '0'; -- "data" transfer
-    dma_req_o.amo   <= '0'; -- no atomic operations
-    dma_req_o.burst <= '0'; -- no burst transfers
-    dma_req_o.lock  <= '0'; -- no locked accesses
-    -- read/write --
-    if (engine.state = S_READ_REQ) or (engine.state = S_READ_RSP) then -- read access
-      dma_req_o.addr <= engine.src_addr(31 downto 2) & "00";
-      dma_req_o.rw   <= '0';
-      if (engine.src_type(0) = '0') then -- byte
-        dma_req_o.ben(to_integer(unsigned(engine.src_addr(1 downto 0)))) <= '1';
-      else -- word
-        dma_req_o.ben <= (others => '1');
-      end if;
-    else -- write access
-      dma_req_o.addr <= engine.dst_addr(31 downto 2) & "00";
-      dma_req_o.rw   <= '1';
-      if (engine.dst_type(0) = '0') then -- byte
-        dma_req_o.ben(to_integer(unsigned(engine.dst_addr(1 downto 0)))) <= '1';
-      else -- word
-        dma_req_o.ben <= (others => '1');
-      end if;
-    end if;
-    -- output data alignment --
-    if (engine.dst_type(0) = '0') then -- byte
-      dma_req_o.data <= data_buf(7 downto 0) & data_buf(7 downto 0) & data_buf(7 downto 0) & data_buf(7 downto 0);
-    else -- word
-      dma_req_o.data <= data_buf;
-    end if;
-    -- request strobe --
-    if (engine.state = S_READ_REQ) or (engine.state = S_WRITE_REQ) then
-      dma_req_o.stb <= '1';
-    end if;
-  end process bus_control;
-
-
   -- Input Data Alignment -------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   src_align: process(rstn_i, clk_i)
@@ -357,24 +330,65 @@ begin
       if (engine.state = S_READ_RSP) then
         if (engine.src_type(0) = '0') then -- byte
           case engine.src_addr(1 downto 0) is
-            when "00"   => data_buf <= x"000000" & rdata(7 downto 0);
-            when "01"   => data_buf <= x"000000" & rdata(15 downto 8);
-            when "10"   => data_buf <= x"000000" & rdata(23 downto 16);
-            when others => data_buf <= x"000000" & rdata(31 downto 24);
+            when "00"   => data_buf <= rep4_f(dma_rsp_i.data( 7 downto  0));
+            when "01"   => data_buf <= rep4_f(dma_rsp_i.data(15 downto  8));
+            when "10"   => data_buf <= rep4_f(dma_rsp_i.data(23 downto 16));
+            when others => data_buf <= rep4_f(dma_rsp_i.data(31 downto 24));
           end case;
         else -- word
-          data_buf <= rdata;
+          data_buf <= dma_rsp_i.data;
         end if;
       end if;
     end if;
   end process src_align;
 
-  -- swap byte order (Endianness conversion) --
-  bswap_gen:
-  for i in 0 to 3 generate
-    rdata(i*8+7 downto i*8) <= dma_rsp_i.data(i*8+7 downto i*8) when (engine.bswap = '0') else
-                               dma_rsp_i.data((32-i*8)-1 downto 32-(i+1)*8);
-  end generate;
+
+  -- Bus Output Control ---------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  bus_control: process(engine, data_buf)
+  begin
+    dma_req_o <= req_terminate_c; -- all-zero by default
+    -- access type --
+    dma_req_o.meta  <= '0' & priv_mode_m_c & '0'; -- non-debug, privileged, data
+    dma_req_o.amo   <= '0'; -- no atomic operations
+    dma_req_o.burst <= '0'; -- no burst transfers
+    dma_req_o.lock  <= '0'; -- no locked accesses
+    -- read/write --
+    if (engine.state = S_READ_REQ) or (engine.state = S_READ_RSP) then -- read access
+      dma_req_o.addr <= engine.src_addr(31 downto 2) & "00";
+      dma_req_o.rw   <= '0';
+      if (engine.src_type(0) = '0') then -- byte
+        dma_req_o.ben <= onehot_f(engine.src_addr(1 downto 0));
+      else -- word
+        dma_req_o.ben <= (others => '1');
+      end if;
+    else -- write access
+      dma_req_o.addr <= engine.dst_addr(31 downto 2) & "00";
+      dma_req_o.rw   <= '1';
+      if (engine.dst_type(0) = '0') then -- byte
+        if (engine.bswap = '0') then
+          dma_req_o.ben <= onehot_f(engine.dst_addr(1 downto 0));
+        else
+          dma_req_o.ben <= onehot_f(not engine.dst_addr(1 downto 0));
+        end if;
+      else -- word
+        dma_req_o.ben <= (others => '1');
+      end if;
+    end if;
+    -- output data alignment --
+    if (engine.bswap = '0') then
+      dma_req_o.data <= data_buf;
+    else -- swap Endianness
+      dma_req_o.data( 7 downto  0) <= data_buf(31 downto 24);
+      dma_req_o.data(15 downto  8) <= data_buf(23 downto 16);
+      dma_req_o.data(23 downto 16) <= data_buf(15 downto  8);
+      dma_req_o.data(31 downto 24) <= data_buf( 7 downto  0);
+    end if;
+    -- request strobe --
+    if (engine.state = S_READ_REQ) or (engine.state = S_WRITE_REQ) then
+      dma_req_o.stb <= '1';
+    end if;
+  end process bus_control;
 
 
 end neorv32_dma_rtl;

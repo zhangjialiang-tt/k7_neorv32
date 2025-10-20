@@ -18,20 +18,13 @@ package neorv32_package is
 -- Architecture Configuration and Constants
 -- **********************************************************************************************************
 
-  -- Architecture Configuration -------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  -- max response time for processor-internal bus transactions --
-  -- cycles after which an unacknowledged internal bus access will timeout raising a bus fault exception
-  constant bus_timeout_c : natural := 16; -- has to be a power of two
-
-  -- instruction monitor: raise exception if multi-cycle operation times out --
-  constant monitor_mc_tmo_c : natural := 9; -- = log2 of max execution cycles; default = 2^9 = 512 cycles
-
   -- Architecture Constants -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  constant hw_version_c : std_ulogic_vector(31 downto 0) := x"01110902"; -- hardware version
-  constant archid_c     : natural := 19; -- official RISC-V architecture ID
-  constant XLEN         : natural := 32; -- native data path width
+  constant hw_version_c  : std_ulogic_vector(31 downto 0) := x"01120306"; -- hardware version
+  constant archid_c      : natural := 19; -- official RISC-V architecture ID
+  constant XLEN          : natural := 32; -- native data path width
+  constant int_bus_tmo_c : natural := 16; -- internal bus timeout window; has to be a power of two
+  constant alu_cp_tmo_c  : natural := 9;  -- log2 of max ALU co-processor execution cycles
 
   -- Check if we're inside the Matrix -------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -110,23 +103,16 @@ package neorv32_package is
   constant clk_div2048_c : natural := 6;
   constant clk_div4096_c : natural := 7;
 
-  -- Internal Memory Types ------------------------------------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  type mem32_t is array (natural range <>) of std_ulogic_vector(31 downto 0); -- memory with 32-bit entries
-  type mem8_t  is array (natural range <>) of std_ulogic_vector(7 downto 0);  -- memory with 8-bit entries
-
   -- Internal Bus Interface -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   -- bus request --
   type bus_req_t is record
+    meta  : std_ulogic_vector(2 downto 0); -- access meta information
     addr  : std_ulogic_vector(31 downto 0); -- access address
     data  : std_ulogic_vector(31 downto 0); -- write data
     ben   : std_ulogic_vector(3 downto 0); -- byte enable
     stb   : std_ulogic; -- request strobe, single-shot
     rw    : std_ulogic; -- 0 = read, 1 = write
-    src   : std_ulogic; -- 0 = data access, 1 = instruction fetch
-    priv  : std_ulogic; -- set if privileged (machine-mode) access
-    debug : std_ulogic; -- set if debug mode access
     amo   : std_ulogic; -- set if atomic memory operation
     amoop : std_ulogic_vector(3 downto 0); -- type of atomic memory operation
     burst : std_ulogic; -- set if part of burst access
@@ -135,16 +121,14 @@ package neorv32_package is
     fence : std_ulogic; -- set if fence(.i) operation, single-shot
   end record;
 
-  -- source (request) termination --
+  -- bus source (request) termination --
   constant req_terminate_c : bus_req_t := (
+    meta  => (others => '0'),
     addr  => (others => '0'),
     data  => (others => '0'),
     ben   => (others => '0'),
     stb   => '0',
     rw    => '0',
-    src   => '0',
-    priv  => '0',
-    debug => '0',
     amo   => '0',
     amoop => (others => '0'),
     burst => '0',
@@ -159,7 +143,7 @@ package neorv32_package is
     data : std_ulogic_vector(31 downto 0); -- read data, valid if ack = 1
   end record;
 
-  -- endpoint (response) termination --
+  -- bus endpoint (response) termination --
   constant rsp_terminate_c : bus_rsp_t := (
     ack  => '0',
     err  => '0',
@@ -170,15 +154,15 @@ package neorv32_package is
   -- -------------------------------------------------------------------------------------------
   -- request --
   type dmi_req_t is record
+    op   : std_ulogic_vector(1 downto 0); -- single-shot
     addr : std_ulogic_vector(6 downto 0);
-    op   : std_ulogic_vector(1 downto 0);
     data : std_ulogic_vector(31 downto 0);
   end record;
 
   -- source (request) termination --
   constant dmi_req_terminate_c : dmi_req_t := (
-    addr => (others => '0'),
     op   => (others => '0'),
+    addr => (others => '0'),
     data => (others => '0')
   );
 
@@ -190,7 +174,7 @@ package neorv32_package is
   -- response --
   type dmi_rsp_t is record
     data : std_ulogic_vector(31 downto 0);
-    ack  : std_ulogic;
+    ack  : std_ulogic; -- single-shot
   end record;
 
   -- endpoint (response) termination --
@@ -242,14 +226,68 @@ package neorv32_package is
   -- CPU Trace Port -------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   type trace_port_t is record
-    valid : std_ulogic; -- set when all signals are valid
-    pc    : std_ulogic_vector(31 downto 0); -- instruction address
-    inst  : std_ulogic_vector(31 downto 0); -- instruction word
-    rvc   : std_ulogic; -- is decompressed instruction
-    mode  : std_ulogic_vector(1 downto 0); -- [1] = debug; [0] = privilege level
-    delta : std_ulogic; -- non-linear PC change; valid without "valid" being set
-    trap  : std_ulogic; -- trap-entry; valid without "valid" being set
+    valid     : std_ulogic; -- all other signals are valid when set
+    -- instruction metadata --
+    order     : std_ulogic_vector(31 downto 0); -- instruction index
+    insn      : std_ulogic_vector(31 downto 0); -- instruction word
+    trap      : std_ulogic; -- set if the current instruction causes a sync exception
+    halt      : std_ulogic; -- set if last instruction before halting
+    intr      : std_ulogic; -- set if executing the first instruction of a trap handler
+    mode      : std_ulogic_vector(1 downto 0); -- 00 = user mode, 11 = machine mode
+    ixl       : std_ulogic_vector(1 downto 0); -- XLEN; 01 = 32-bit
+    debug     : std_ulogic; -- set if instruction is executed in debug-mode
+    compr     : std_ulogic; -- set if instruction is a decompressed instruction
+    -- integer register --
+    rs1_addr  : std_ulogic_vector(4 downto 0);  -- rs1 address
+    rs2_addr  : std_ulogic_vector(4 downto 0);  -- rs2 address
+    rs1_rdata : std_ulogic_vector(31 downto 0); -- rs1 read data
+    rs2_rdata : std_ulogic_vector(31 downto 0); -- rs2 read data
+    rd_addr   : std_ulogic_vector(4 downto 0);  -- rd address
+    rd_rdata  : std_ulogic_vector(31 downto 0); -- rd write data
+    -- program counter --
+    pc_rdata  : std_ulogic_vector(31 downto 0); -- current instruction address
+    pc_wdata  : std_ulogic_vector(31 downto 0); -- next instruction address
+    -- control and status register --
+    csr_addr  : std_ulogic_vector(11 downto 0); -- csr address
+    csr_rdata : std_ulogic_vector(31 downto 0); -- csr read data
+    csr_wdata : std_ulogic_vector(31 downto 0); -- csr write data
+    -- memory access --
+    mem_addr  : std_ulogic_vector(31 downto 0); -- address
+    mem_rmask : std_ulogic_vector(3 downto 0);  -- read-enable
+    mem_wmask : std_ulogic_vector(3 downto 0);  -- write-enable
+    mem_rdata : std_ulogic_vector(31 downto 0); -- read data
+    mem_wdata : std_ulogic_vector(31 downto 0); -- write data
   end record;
+
+  -- trace source termination --
+  constant trace_port_terminate_c : trace_port_t := (
+    valid     => '0',
+    order     => (others => '0'),
+    insn      => (others => '0'),
+    trap      => '0',
+    halt      => '0',
+    intr      => '0',
+    mode      => (others => '0'),
+    ixl       => "01",
+    debug     => '0',
+    compr     => '0',
+    rs1_addr  => (others => '0'),
+    rs2_addr  => (others => '0'),
+    rs1_rdata => (others => '0'),
+    rs2_rdata => (others => '0'),
+    rd_addr   => (others => '0'),
+    rd_rdata  => (others => '0'),
+    pc_rdata  => (others => '0'),
+    pc_wdata  => (others => '0'),
+    csr_addr  => (others => '0'),
+    csr_rdata => (others => '0'),
+    csr_wdata => (others => '0'),
+    mem_addr  => (others => '0'),
+    mem_rmask => (others => '0'),
+    mem_wmask => (others => '0'),
+    mem_rdata => (others => '0'),
+    mem_wdata => (others => '0')
+  );
 
 -- **********************************************************************************************************
 -- RISC-V ISA Definitions
@@ -451,11 +489,6 @@ package neorv32_package is
   constant csr_dcsr_c           : std_ulogic_vector(11 downto 0) := x"7b0";
   constant csr_dpc_c            : std_ulogic_vector(11 downto 0) := x"7b1";
   constant csr_dscratch0_c      : std_ulogic_vector(11 downto 0) := x"7b2";
-  -- NEORV32-specific read/write user registers --
-  constant csr_cfureg0_c        : std_ulogic_vector(11 downto 0) := x"800";
-  constant csr_cfureg1_c        : std_ulogic_vector(11 downto 0) := x"801";
-  constant csr_cfureg2_c        : std_ulogic_vector(11 downto 0) := x"802";
-  constant csr_cfureg3_c        : std_ulogic_vector(11 downto 0) := x"803";
   -- machine counters/timers --
   constant csr_mcycle_c         : std_ulogic_vector(11 downto 0) := x"b00";
   constant csr_mtime_c          : std_ulogic_vector(11 downto 0) := x"b01";
@@ -529,7 +562,7 @@ package neorv32_package is
   constant csr_mhartid_c        : std_ulogic_vector(11 downto 0) := x"f14";
   constant csr_mconfigptr_c     : std_ulogic_vector(11 downto 0) := x"f15";
   -- NEORV32-specific machine registers --
---constant csr_mxcsr_c          : std_ulogic_vector(11 downto 0) := x"bc0"; -- to be implemented...
+  constant csr_mxcsr_c          : std_ulogic_vector(11 downto 0) := x"bc0";
   constant csr_mxisa_c          : std_ulogic_vector(11 downto 0) := x"fc0";
 --constant csr_mxisah_c         : std_ulogic_vector(11 downto 0) := x"fc1"; -- to be implemented...
 
@@ -543,7 +576,7 @@ package neorv32_package is
     -- instruction fetch --
     if_fence     : std_ulogic;                     -- fence.i operation
     if_reset     : std_ulogic;                     -- restart instruction fetch
-    if_ack       : std_ulogic;                     -- consume data from instruction fetch
+    if_ready     : std_ulogic;                     -- ready for next instruction
     -- program counter --
     pc_cur       : std_ulogic_vector(31 downto 0); -- address of current instruction
     pc_nxt       : std_ulogic_vector(31 downto 0); -- address of next instruction
@@ -567,7 +600,8 @@ package neorv32_package is
     -- load/store unit --
     lsu_req      : std_ulogic;                     -- trigger memory access request
     lsu_rw       : std_ulogic;                     -- 0: read access, 1: write access
-    lsu_amo      : std_ulogic;                     -- set if atomic memory operation
+    lsu_rmw      : std_ulogic;                     -- set if atomic read-modify-write operation
+    lsu_rvs      : std_ulogic;                     -- set if atomic reservation-set operation
     lsu_mo_we    : std_ulogic;                     -- memory address and data output register write enable
     lsu_fence    : std_ulogic;                     -- fence operation
     lsu_priv     : std_ulogic;                     -- effective privilege mode for load/store
@@ -585,15 +619,16 @@ package neorv32_package is
     ir_opcode    : std_ulogic_vector(6 downto 0);  -- opcode bit field
     -- status --
     cpu_priv     : std_ulogic;                     -- effective privilege mode
-    cpu_trap     : std_ulogic;                     -- set when CPU is entering trap exec
+    cpu_trap     : std_ulogic;                     -- set when CPU is entering trap
+    cpu_sync_exc : std_ulogic;                     -- set when CPU encounters a synchronous exceptions
     cpu_debug    : std_ulogic;                     -- set when CPU is in debug mode
   end record;
 
-  -- control bus reset initializer --
+  -- control bus reset termination --
   constant ctrl_bus_zero_c : ctrl_bus_t := (
     if_fence     => '0',
     if_reset     => '0',
-    if_ack       => '0',
+    if_ready     => '0',
     pc_cur       => (others => '0'),
     pc_nxt       => (others => '0'),
     pc_ret       => (others => '0'),
@@ -613,7 +648,8 @@ package neorv32_package is
     alu_cp_fpu   => '0',
     lsu_req      => '0',
     lsu_rw       => '0',
-    lsu_amo      => '0',
+    lsu_rmw      => '0',
+    lsu_rvs      => '0',
     lsu_mo_we    => '0',
     lsu_fence    => '0',
     lsu_priv     => '0',
@@ -628,6 +664,7 @@ package neorv32_package is
     ir_opcode    => (others => '0'),
     cpu_priv     => '0',
     cpu_trap     => '0',
+    cpu_sync_exc => '0',
     cpu_debug    => '0'
   );
 
@@ -782,8 +819,8 @@ package neorv32_package is
   function bit_rev_f(input : std_ulogic_vector) return std_ulogic_vector;
   function is_power_of_two_f(input : natural) return boolean;
   function replicate_f(input : std_ulogic; num : natural) return std_ulogic_vector;
-  impure function mem32_init_f(init : mem32_t; depth : natural) return mem32_t;
   function print_hex_f(data : std_ulogic_vector) return string;
+  function match_f(input : std_ulogic_vector; pattern : std_ulogic_vector) return boolean;
 
 -- **********************************************************************************************************
 -- NEORV32 Processor Top Entity (component prototype)
@@ -791,9 +828,9 @@ package neorv32_package is
 
   component neorv32_top
     generic (
-      -- Processor Clocking --
+      -- General --
       CLOCK_FREQUENCY       : natural                        := 0;
-      -- Dual-Core Configuration --
+      TRACE_PORT_EN         : boolean                        := false;
       DUAL_CORE_EN          : boolean                        := false;
       -- Boot Configuration --
       BOOT_MODE_SELECT      : natural range 0 to 2           := 0;
@@ -829,6 +866,7 @@ package neorv32_package is
       RISCV_ISA_Zksh        : boolean                        := false;
       RISCV_ISA_Zxcfu       : boolean                        := false;
       -- Tuning Options --
+      CPU_CONSTT_BR_EN      : boolean                        := false;
       CPU_FAST_MUL_EN       : boolean                        := false;
       CPU_FAST_SHIFT_EN     : boolean                        := false;
       CPU_RF_HW_RST_EN      : boolean                        := false;
@@ -857,7 +895,7 @@ package neorv32_package is
       CACHE_BURSTS_EN       : boolean                        := true;
       -- External bus interface (XBUS) --
       XBUS_EN               : boolean                        := false;
-      XBUS_TIMEOUT          : natural                        := 255;
+      XBUS_TIMEOUT          : natural                        := 2048;
       XBUS_REGSTAGE_EN      : boolean                        := false;
       -- Processor peripherals --
       IO_DISABLE_SYSINFO    : boolean                        := false;
@@ -903,6 +941,9 @@ package neorv32_package is
       rstn_i         : in  std_ulogic;
       rstn_ocd_o     : out std_ulogic;
       rstn_wdt_o     : out std_ulogic;
+      -- Execution trace (available if TRACE_PORT_EN = true) --
+      trace_cpu0_o   : out trace_port_t;
+      trace_cpu1_o   : out trace_port_t;
       -- JTAG on-chip debugger interface (available if OCD_EN = true) --
       jtag_tck_i     : in  std_ulogic := 'L';
       jtag_tdi_i     : in  std_ulogic := 'L';
@@ -1150,7 +1191,7 @@ package body neorv32_package is
     end if;
   end function is_power_of_two_f;
 
-  -- Replicate input bit num times ----------------------------------------------------------
+  -- Replicate bit --------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   function replicate_f(input : std_ulogic; num : natural) return std_ulogic_vector is
     variable tmp_v : std_ulogic_vector(num-1 downto 0);
@@ -1158,20 +1199,6 @@ package body neorv32_package is
     tmp_v := (others => input);
     return tmp_v;
   end function replicate_f;
-
-  -- Initialize mem32_t array from another mem32_t array ------------------------------------
-  -- -------------------------------------------------------------------------------------------
-  impure function mem32_init_f(init : mem32_t; depth : natural) return mem32_t is
-    variable mem_v : mem32_t(0 to depth-1);
-  begin
-    mem_v := (others => (others => '0'));
-    if (init'length > depth) then
-      report "[NEORV32] mem32_init_f: initialization image is overflowing memory range!" severity warning;
-    else
-      mem_v(0 to init'length-1) := init(0 to init'length-1);
-    end if;
-    return mem_v;
-  end function mem32_init_f;
 
   -- Print hex value as string --------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
@@ -1184,5 +1211,23 @@ package body neorv32_package is
     end loop;
     return res_v;
   end function print_hex_f;
+
+  -- Check if vector matches binary pattern (skip elements compared with '-') ---------------
+  -- -------------------------------------------------------------------------------------------
+  function match_f(input : std_ulogic_vector; pattern : std_ulogic_vector) return boolean is
+    variable match_v : boolean;
+  begin
+    if (input'length /= pattern'length) then -- no match if different sizes
+      return false;
+    else
+      match_v := true;
+      for i in input'length-1 downto 0 loop
+        if (pattern(i) = '1') or (pattern(i) = '0') then -- valid pattern value, skip everything else
+          match_v := match_v and boolean(pattern(i) = input(i));
+        end if;
+      end loop;
+      return match_v;
+    end if;
+  end function match_f;
 
 end neorv32_package;

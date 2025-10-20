@@ -146,16 +146,14 @@ begin
       -- read access --
       if (bus_req_i.stb = '1') and (bus_req_i.rw = '0') then
         if (bus_req_i.addr(2) = '0') then -- control register
-          bus_rsp_o.data(ctrl_en_c)                            <= ctrl.enable;
-          bus_rsp_o.data(ctrl_prsc1_c downto ctrl_prsc0_c)     <= ctrl.clk_prsc;
-          bus_rsp_o.data(ctrl_clkdiv7_c downto ctrl_clkdiv0_c) <= ctrl.clk_div;
-          --
+          bus_rsp_o.data(ctrl_en_c)                                  <= ctrl.enable;
+          bus_rsp_o.data(ctrl_prsc1_c downto ctrl_prsc0_c)           <= ctrl.clk_prsc;
+          bus_rsp_o.data(ctrl_clkdiv7_c downto ctrl_clkdiv0_c)       <= ctrl.clk_div;
           bus_rsp_o.data(ctrl_fifo_size3_c downto ctrl_fifo_size0_c) <= std_ulogic_vector(to_unsigned(log2_fifo_size_c, 4));
-          --
-          bus_rsp_o.data(ctrl_tx_full_c)  <= not fifo.tx_free;
-          bus_rsp_o.data(ctrl_rx_avail_c) <= fifo.rx_avail;
-          bus_rsp_o.data(ctrl_sense_c)    <= serial.wire_in(1);
-          bus_rsp_o.data(ctrl_busy_c)     <= fifo.tx_avail or serial.busy;
+          bus_rsp_o.data(ctrl_tx_full_c)                             <= not fifo.tx_free;
+          bus_rsp_o.data(ctrl_rx_avail_c)                            <= fifo.rx_avail;
+          bus_rsp_o.data(ctrl_sense_c)                               <= serial.wire_in(1);
+          bus_rsp_o.data(ctrl_busy_c)                                <= fifo.tx_avail or serial.busy;
         else -- data register
           bus_rsp_o.data(dcmd_msb_c downto dcmd_lsb_c) <= fifo.rx_rdata(7 downto 0);
           bus_rsp_o.data(dcmd_pres_c)                  <= fifo.rx_rdata(8);
@@ -170,22 +168,17 @@ begin
   -- -------------------------------------------------------------------------------------------
 
   -- TX FIFO --
-  tx_fifo_inst: entity neorv32.neorv32_fifo
+  tx_fifo_inst: entity neorv32.neorv32_prim_fifo
   generic map (
-    FIFO_DEPTH => ONEWIRE_FIFO,
-    FIFO_WIDTH => 10, -- 2-bit command + 8-bit data
-    FIFO_RSYNC => true,
-    FIFO_SAFE  => true,
-    FULL_RESET => false,
-    OUT_GATE   => false
+    AWIDTH  => log2_fifo_size_c,
+    DWIDTH  => 10, -- 2-bit command + 8-bit data
+    OUTGATE => false
   )
   port map (
-    -- control and status --
+    -- global control --
     clk_i   => clk_i,
     rstn_i  => rstn_i,
     clear_i => fifo.tx_clr,
-    half_o  => open,
-    level_o => open,
     -- write port --
     wdata_i => fifo.tx_wdata,
     we_i    => fifo.tx_we,
@@ -203,22 +196,17 @@ begin
 
 
   -- RX FIFO --
-  rx_fifo_inst: entity neorv32.neorv32_fifo
+  rx_fifo_inst: entity neorv32.neorv32_prim_fifo
   generic map (
-    FIFO_DEPTH => ONEWIRE_FIFO,
-    FIFO_WIDTH => 9, -- 1-bit presence status + 8-bit data
-    FIFO_RSYNC => true,
-    FIFO_SAFE  => true,
-    FULL_RESET => false,
-    OUT_GATE   => false
+    AWIDTH  => log2_fifo_size_c,
+    DWIDTH  => 9, -- 1-bit presence status + 8-bit data
+    OUTGATE => false
   )
   port map (
-    -- control --
+    -- global control --
     clk_i   => clk_i,
     rstn_i  => rstn_i,
     clear_i => fifo.rx_clr,
-    half_o  => open,
-    level_o => open,
     -- write port --
     wdata_i => fifo.rx_wdata,
     we_i    => fifo.rx_we,

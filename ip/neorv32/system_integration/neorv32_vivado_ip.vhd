@@ -25,9 +25,8 @@ entity neorv32_vivado_ip is
     -- ------------------------------------------------------------
     -- Configuration Generics
     -- ------------------------------------------------------------
-    -- Clocking --
+    -- General --
     CLOCK_FREQUENCY       : natural                        := 100_000_000;
-    -- Dual-Core Configuration --
     DUAL_CORE_EN          : boolean                        := false;
     -- Boot Configuration --
     BOOT_MODE_SELECT      : natural range 0 to 2           := 0;
@@ -63,6 +62,7 @@ entity neorv32_vivado_ip is
     RISCV_ISA_Zksh        : boolean                        := false;
     RISCV_ISA_Zxcfu       : boolean                        := false;
     -- Tuning Options --
+    CPU_CONSTT_BR_EN      : boolean                        := false;
     CPU_FAST_MUL_EN       : boolean                        := false;
     CPU_FAST_SHIFT_EN     : boolean                        := false;
     CPU_RF_HW_RST_EN      : boolean                        := false;
@@ -91,6 +91,7 @@ entity neorv32_vivado_ip is
     CACHE_BURSTS_EN       : boolean                        := true;
     -- External Bus Interface --
     XBUS_EN               : boolean                        := false;
+    XBUS_TIMEOUT          : natural                        := 2048;
     XBUS_REGSTAGE_EN      : boolean                        := false;
     -- Processor peripherals --
     IO_GPIO_EN            : boolean                        := false;
@@ -355,9 +356,8 @@ begin
   -- -------------------------------------------------------------------------------------------
   neorv32_top_inst: neorv32_top
   generic map (
-    -- Clocking --
+    -- General --
     CLOCK_FREQUENCY     => CLOCK_FREQUENCY,
-    -- Dual-Core Configuration --
     DUAL_CORE_EN        => DUAL_CORE_EN,
     -- Boot Configuration --
     BOOT_MODE_SELECT    => BOOT_MODE_SELECT,
@@ -393,6 +393,7 @@ begin
     RISCV_ISA_Zksh      => RISCV_ISA_Zksh,
     RISCV_ISA_Zxcfu     => RISCV_ISA_Zxcfu,
     -- Extension Options --
+    CPU_CONSTT_BR_EN    => CPU_CONSTT_BR_EN,
     CPU_FAST_MUL_EN     => CPU_FAST_MUL_EN,
     CPU_FAST_SHIFT_EN   => CPU_FAST_SHIFT_EN,
     CPU_RF_HW_RST_EN    => CPU_RF_HW_RST_EN,
@@ -421,7 +422,7 @@ begin
     CACHE_BURSTS_EN     => burst_en_c,
     -- External bus interface --
     XBUS_EN             => XBUS_EN,
-    XBUS_TIMEOUT        => 0, -- AXI does not allow any timeouts
+    XBUS_TIMEOUT        => XBUS_TIMEOUT,
     XBUS_REGSTAGE_EN    => XBUS_REGSTAGE_EN,
     -- Processor peripherals --
     IO_DISABLE_SYSINFO  => false,

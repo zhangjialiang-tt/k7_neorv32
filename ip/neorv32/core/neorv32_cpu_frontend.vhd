@@ -39,6 +39,25 @@ end neorv32_cpu_frontend;
 
 architecture neorv32_cpu_frontend_rtl of neorv32_cpu_frontend is
 
+  -- instruction prefetch buffer --
+  component neorv32_cpu_frontend_ipb
+  generic (
+    AWIDTH : natural;
+    DWIDTH : natural
+  );
+  port (
+    clk_i   : in  std_ulogic;
+    rstn_i  : in  std_ulogic;
+    clear_i : in  std_ulogic;
+    wdata_i : in  std_ulogic_vector(DWIDTH-1 downto 0);
+    we_i    : in  std_ulogic;
+    free_o  : out std_ulogic;
+    re_i    : in  std_ulogic;
+    rdata_o : out std_ulogic_vector(DWIDTH-1 downto 0);
+    avail_o : out std_ulogic
+  );
+  end component;
+
   -- instruction fetch engine --
   type state_t is (S_RESTART, S_REQUEST, S_PENDING);
   type fetch_t is record
@@ -46,6 +65,7 @@ architecture neorv32_cpu_frontend_rtl of neorv32_cpu_frontend is
     restart : std_ulogic; -- buffered restart request (after branch)
     pc      : std_ulogic_vector(XLEN-1 downto 0);
     priv    : std_ulogic; -- fetch privilege level
+    debug   : std_ulogic; -- debug-mode access
   end record;
   signal fetch : fetch_t;
 
@@ -60,7 +80,7 @@ architecture neorv32_cpu_frontend_rtl of neorv32_cpu_frontend is
 
   -- instruction issue engine --
   signal align_q, align_set, align_clr : std_ulogic;
-  signal ipb_ack : std_ulogic_vector(1 downto 0);
+  signal issue_valid : std_ulogic_vector(1 downto 0);
   signal cmd16 : std_ulogic_vector(15 downto 0);
   signal cmd32 : std_ulogic_vector(31 downto 0);
 
@@ -79,6 +99,7 @@ begin
       fetch.restart <= '1'; -- reset IPB and issue engine
       fetch.pc      <= (others => '0');
       fetch.priv    <= priv_mode_m_c;
+      fetch.debug   <= '0';
     elsif rising_edge(clk_i) then
       case fetch.state is
 
@@ -87,6 +108,7 @@ begin
           fetch.restart <= '0'; -- restart done
           fetch.pc      <= ctrl_i.pc_nxt; -- initialize from PC
           fetch.priv    <= ctrl_i.cpu_priv; -- set new privilege level
+          fetch.debug   <= ctrl_i.cpu_debug; -- access from debug-mode
           fetch.state   <= S_REQUEST;
 
         when S_REQUEST => -- request next 32-bit-aligned instruction word
@@ -120,14 +142,12 @@ begin
   end process fetch_fsm;
 
   -- instruction bus request --
-  ibus_req_o.addr  <= fetch.pc(XLEN-1 downto 2) & "00"; -- word aligned
+  ibus_req_o.meta  <= fetch.debug & fetch.priv & '1'; -- LSB: instruction access
+  ibus_req_o.addr  <= fetch.pc(XLEN-1 downto 2) & "00";    -- word aligned
   ibus_req_o.stb   <= '1' when (fetch.state = S_REQUEST) and (ipb.free = "11") else '0';
   ibus_req_o.data  <= (others => '0');  -- read-only
   ibus_req_o.ben   <= (others => '1');  -- always full-word access
   ibus_req_o.rw    <= '0';              -- read-only
-  ibus_req_o.src   <= '1';              -- always "instruction fetch" access
-  ibus_req_o.priv  <= fetch.priv;       -- current effective privilege level
-  ibus_req_o.debug <= ctrl_i.cpu_debug; -- CPU is in debug mode
   ibus_req_o.amo   <= '0';              -- cannot be an atomic memory operation
   ibus_req_o.amoop <= (others => '0');  -- cannot be an atomic memory operation
   ibus_req_o.burst <= '0';              -- only single-access
@@ -147,22 +167,16 @@ begin
   -- -------------------------------------------------------------------------------------------
   prefetch_buffer:
   for i in 0 to 1 generate
-    prefetch_buffer_inst: entity neorv32.neorv32_fifo
+    ipb_inst: neorv32_cpu_frontend_ipb
     generic map (
-      FIFO_DEPTH => 2,     -- number of IPB entries; has to be a power of two, min 2
-      FIFO_WIDTH => 17,    -- error status & instruction half-word data
-      FIFO_RSYNC => false, -- we NEED to read data asynchronously
-      FIFO_SAFE  => false, -- no safe access required (ensured by FIFO-external logic)
-      FULL_RESET => false, -- no need for a full hardware reset,
-      OUT_GATE   => false  -- no output gate required
+      AWIDTH => 1, -- 1 address bit = 2 entries
+      DWIDTH => 17 -- error status & instruction half-word data
     )
     port map (
-      -- control and status --
+      -- global control --
       clk_i   => clk_i,         -- clock, rising edge
       rstn_i  => rstn_i,        -- async reset, low-active
       clear_i => fetch.restart, -- sync reset, high-active
-      half_o  => open,          -- at least half full
-      level_o => open,          -- fill level, zero-extended
       -- write port --
       wdata_i => ipb.wdata(i),  -- write data
       we_i    => ipb.we(i),     -- write enable
@@ -206,7 +220,7 @@ begin
       elsif rising_edge(clk_i) then
         if (fetch.restart = '1') then
           align_q <= ctrl_i.pc_nxt(1); -- branch to unaligned address?
-        elsif (ctrl_i.if_ack = '1') then
+        elsif (ipb.re(0) = '1') or (ipb.re(1) = '1') then
           align_q <= (align_q and (not align_clr)) or align_set; -- alignment "RS flip-flop"
         end if;
       end if;
@@ -219,43 +233,47 @@ begin
       align_clr <= '0';
       -- start at LOW half-word --
       if (align_q = '0') then
-        frontend_o.fault <= ipb.rdata(0)(16);
         if (ipb.rdata(0)(1 downto 0) /= "11") then -- compressed, consume IPB(0) entry
           align_set        <= ipb.avail(0); -- start of next instruction word is NOT 32-bit-aligned
-          ipb_ack          <= "01";
-          frontend_o.valid <= ipb.avail(0);
+          issue_valid(0)   <= ipb.avail(0);
+          issue_valid(1)   <= '0';
+          frontend_o.fault <= ipb.rdata(0)(16);
           frontend_o.instr <= cmd32;
           frontend_o.compr <= '1';
         else -- aligned uncompressed, consume both IPB entries
-          ipb_ack          <= "11";
-          frontend_o.valid <= ipb.avail(1) and ipb.avail(0);
+          issue_valid(0)   <= ipb.avail(1) and ipb.avail(0);
+          issue_valid(1)   <= ipb.avail(1) and ipb.avail(0);
+          frontend_o.fault <= ipb.rdata(1)(16) or ipb.rdata(0)(16);
           frontend_o.instr <= ipb.rdata(1)(15 downto 0) & ipb.rdata(0)(15 downto 0);
           frontend_o.compr <= '0';
         end if;
       -- start at HIGH half-word --
       else
-        frontend_o.fault <= ipb.rdata(1)(16);
         if (ipb.rdata(1)(1 downto 0) /= "11") then -- compressed, consume IPB(1) entry
           align_clr        <= ipb.avail(1); -- start of next instruction word is 32-bit-aligned again
-          ipb_ack          <= "10";
-          frontend_o.valid <= ipb.avail(1);
+          issue_valid(0)   <= '0';
+          issue_valid(1)   <= ipb.avail(1);
+          frontend_o.fault <= ipb.rdata(1)(16);
           frontend_o.instr <= cmd32;
           frontend_o.compr <= '1';
         else -- unaligned uncompressed, consume both IPB entries
-          ipb_ack          <= "11";
-          frontend_o.valid <= ipb.avail(0) and ipb.avail(1);
+          issue_valid(0)   <= ipb.avail(0) and ipb.avail(1);
+          issue_valid(1)   <= ipb.avail(0) and ipb.avail(1);
+          frontend_o.fault <= ipb.rdata(0)(16) or ipb.rdata(1)(16);
           frontend_o.instr <= ipb.rdata(0)(15 downto 0) & ipb.rdata(1)(15 downto 0);
           frontend_o.compr <= '0';
         end if;
       end if;
     end process issue_fsm_comb;
 
+    -- issue valid instruction word to execution stage --
+    frontend_o.valid <= issue_valid(1) or issue_valid(0);
+
     -- IPB read access --
-    ipb.re(0) <= ipb_ack(0) and ctrl_i.if_ack;
-    ipb.re(1) <= ipb_ack(1) and ctrl_i.if_ack;
+    ipb.re(0) <= issue_valid(0) and ctrl_i.if_ready;
+    ipb.re(1) <= issue_valid(1) and ctrl_i.if_ready;
 
   end generate; -- /issue_enabled
-
 
   -- issue engine disabled --
   issue_disabled:
@@ -263,15 +281,107 @@ begin
     align_q          <= '0';
     align_set        <= '0';
     align_clr        <= '0';
-    ipb_ack          <= (others => '0');
+    issue_valid      <= (others => '0');
     cmd16            <= (others => '0');
     cmd32            <= (others => '0');
-    ipb.re           <= (others => ctrl_i.if_ack);
+    ipb.re           <= (others => (ctrl_i.if_ready and ipb.avail(0)));
     frontend_o.valid <= ipb.avail(0);
     frontend_o.instr <= ipb.rdata(1)(15 downto 0) & ipb.rdata(0)(15 downto 0);
     frontend_o.compr <= '0';
     frontend_o.fault <= ipb.rdata(0)(16);
   end generate;
 
-
 end neorv32_cpu_frontend_rtl;
+
+
+-- ================================================================================ --
+-- NEORV32 CPU - Instruction Prefetch Buffer                                        --
+-- -------------------------------------------------------------------------------- --
+-- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
+-- Copyright (c) NEORV32 contributors.                                              --
+-- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
+-- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
+-- SPDX-License-Identifier: BSD-3-Clause                                            --
+-- ================================================================================ --
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+library neorv32;
+use neorv32.neorv32_package.all;
+
+entity neorv32_cpu_frontend_ipb is
+  generic (
+    AWIDTH : natural; -- address width
+    DWIDTH : natural  -- data width
+  );
+  port (
+    -- global control --
+    clk_i   : in  std_ulogic; -- clock, rising edge
+    rstn_i  : in  std_ulogic; -- async reset, low-active
+    clear_i : in  std_ulogic; -- sync reset, high-active
+    -- write port --
+    wdata_i : in  std_ulogic_vector(DWIDTH-1 downto 0); -- write data
+    we_i    : in  std_ulogic; -- write enable
+    free_o  : out std_ulogic; -- at least one entry is free when set
+    -- read port --
+    re_i    : in  std_ulogic; -- read enable
+    rdata_o : out std_ulogic_vector(DWIDTH-1 downto 0); -- read data
+    avail_o : out std_ulogic  -- data available when set
+  );
+end neorv32_cpu_frontend_ipb;
+
+architecture neorv32_cpu_frontend_ipb_rtl of neorv32_cpu_frontend_ipb is
+
+  -- pointers and status --
+  signal w_pnt, r_pnt : std_ulogic_vector(AWIDTH downto 0);
+  signal match : std_ulogic;
+
+  -- memory core --
+  type ipb_t is array (0 to (2**AWIDTH)-1) of std_ulogic_vector(DWIDTH-1 downto 0);
+  signal ipb : ipb_t;
+
+begin
+
+  -- Pointers -------------------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  pointer_reg: process(rstn_i, clk_i)
+  begin
+    if (rstn_i = '0') then
+      w_pnt <= (others => '0');
+      r_pnt <= (others => '0');
+    elsif rising_edge(clk_i) then
+      if (clear_i = '1') then
+        w_pnt <= (others => '0');
+      elsif (we_i = '1') then
+        w_pnt <= std_ulogic_vector(unsigned(w_pnt) + 1);
+      end if;
+      if (clear_i = '1') then
+        r_pnt <= (others => '0');
+      elsif (re_i = '1') then
+        r_pnt <= std_ulogic_vector(unsigned(r_pnt) + 1);
+      end if;
+    end if;
+  end process pointer_reg;
+
+  -- status --
+  match   <= '1' when (r_pnt(AWIDTH-1 downto 0) = w_pnt(AWIDTH-1 downto 0)) else '0';
+  free_o  <= '0' when (r_pnt(AWIDTH) /= w_pnt(AWIDTH)) and (match = '1') else '1';
+  avail_o <= '0' when (r_pnt(AWIDTH)  = w_pnt(AWIDTH)) and (match = '1') else '1';
+
+  -- Memory Core ----------------------------------------------------------------------------
+  -- -------------------------------------------------------------------------------------------
+  mem_write: process(clk_i)
+  begin
+    if rising_edge(clk_i) then
+      if (we_i = '1') then
+        ipb(to_integer(unsigned(w_pnt(AWIDTH-1 downto 0)))) <= wdata_i;
+      end if;
+    end if;
+  end process mem_write;
+
+  -- asynchronous(!) read --
+  rdata_o <= ipb(to_integer(unsigned(r_pnt(AWIDTH-1 downto 0))));
+
+end neorv32_cpu_frontend_ipb_rtl;

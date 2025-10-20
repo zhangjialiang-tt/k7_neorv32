@@ -39,12 +39,12 @@ architecture neorv32_trng_rtl of neorv32_trng is
   -- ------------------------------------------------------------------------------------------------
 
   -- control register bits --
-  constant ctrl_en_c         : natural := 0; -- r/w: TRNG enable
-  constant ctrl_fifo_clr_c   : natural := 1; -- -/w: Clear data FIFO (auto clears)
-  constant ctrl_fifo_size0_c : natural := 2; -- r/-: log2(FIFO size) bit 0, LSB
-  constant ctrl_fifo_size3_c : natural := 5; -- r/-: log2(FIFO size) bit 3, MSB
-  constant ctrl_sim_mode_c   : natural := 6; -- r/-: TRNG implemented in pseudo-RNG simulation mode
-  constant ctrl_avail_c      : natural := 7; -- r/-: Random data available
+  constant ctrl_en_c       : natural := 0; -- r/w: TRNG enable
+  constant ctrl_fifo_clr_c : natural := 1; -- -/w: Clear data FIFO (auto clears)
+  constant ctrl_fifo0_c    : natural := 2; -- r/-: log2(FIFO size) bit 0, LSB
+  constant ctrl_fifo3_c    : natural := 5; -- r/-: log2(FIFO size) bit 3, MSB
+  constant ctrl_sim_mode_c : natural := 6; -- r/-: TRNG implemented in pseudo-RNG simulation mode
+  constant ctrl_avail_c    : natural := 7; -- r/-: Random data available
 
   -- helpers --
   constant log2_fifo_size_c : natural := index_size_f(TRNG_FIFO);
@@ -71,10 +71,10 @@ architecture neorv32_trng_rtl of neorv32_trng is
 
   -- FIFO interface --
   type fifo_t is record
-    we,    re    : std_ulogic; -- write/read enable
-    wdata, rdata : std_ulogic_vector(7 downto 0); -- write/read data
-    avail, free  : std_ulogic; -- FIFO level
-    clear, half  : std_ulogic; -- control and status
+    we,    re    : std_ulogic;
+    wdata, rdata : std_ulogic_vector(7 downto 0);
+    avail, free  : std_ulogic;
+    clear        : std_ulogic;
   end record;
   signal fifo : fifo_t;
 
@@ -86,28 +86,26 @@ begin
   begin
     if (rstn_i = '0') then
       bus_rsp_o <= rsp_terminate_c;
-      fifo_clr  <= '0';
       enable    <= '0';
+      fifo_clr  <= '0';
     elsif rising_edge(clk_i) then
-      -- defaults --
+      -- bus handshake --
       bus_rsp_o.ack  <= bus_req_i.stb;
       bus_rsp_o.err  <= '0';
       bus_rsp_o.data <= (others => '0');
-      fifo_clr       <= '0'; -- auto-clear
       -- host access --
+      fifo_clr <= '0'; -- default
       if (bus_req_i.stb = '1') then
-        if (bus_req_i.rw = '1') then -- write access (control register)
+        if (bus_req_i.rw = '1') then -- write control register
           enable   <= bus_req_i.data(ctrl_en_c);
           fifo_clr <= bus_req_i.data(ctrl_fifo_clr_c);
-        else -- read access
-          if (bus_req_i.addr(2) = '0') then -- control register
-            bus_rsp_o.data(ctrl_en_c)                                  <= enable;
-            bus_rsp_o.data(ctrl_fifo_size3_c downto ctrl_fifo_size0_c) <= std_ulogic_vector(to_unsigned(log2_fifo_size_c, 4));
-            bus_rsp_o.data(ctrl_sim_mode_c)                            <= bool_to_ulogic_f(is_simulation_c);
-            bus_rsp_o.data(ctrl_avail_c)                               <= fifo.avail;
-          else -- data register
-            bus_rsp_o.data(7 downto 0) <= fifo.rdata;
-          end if;
+        elsif (bus_req_i.addr(2) = '0') then -- read control register
+          bus_rsp_o.data(ctrl_en_c)                        <= enable;
+          bus_rsp_o.data(ctrl_fifo3_c downto ctrl_fifo0_c) <= std_ulogic_vector(to_unsigned(log2_fifo_size_c, 4));
+          bus_rsp_o.data(ctrl_sim_mode_c)                  <= bool_to_ulogic_f(is_simulation_c);
+          bus_rsp_o.data(ctrl_avail_c)                     <= fifo.avail;
+        else -- read data register
+          bus_rsp_o.data(7 downto 0) <= fifo.rdata;
         end if;
       end if;
     end if;
@@ -134,22 +132,17 @@ begin
 
   -- Data FIFO ("Random Pool") --------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  rnd_pool_fifo_inst: entity neorv32.neorv32_fifo
+  rnd_pool_fifo_inst: entity neorv32.neorv32_prim_fifo
   generic map (
-    FIFO_DEPTH => TRNG_FIFO,
-    FIFO_WIDTH => 8,
-    FIFO_RSYNC => true,
-    FIFO_SAFE  => true,
-    FULL_RESET => false,
-    OUT_GATE   => true -- output zero if no data available
+    AWIDTH  => log2_fifo_size_c,
+    DWIDTH  => 8,
+    OUTGATE => true -- output zero if no data available
   )
   port map (
-    -- control and status --
+    -- global control --
     clk_i   => clk_i,
     rstn_i  => rstn_i,
     clear_i => fifo.clear,
-    half_o  => fifo.half,
-    level_o => open,
     -- write port --
     wdata_i => fifo.wdata,
     we_i    => fifo.we,
