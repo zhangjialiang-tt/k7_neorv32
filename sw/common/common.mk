@@ -64,8 +64,7 @@ NEORV32_SRC_PATH = $(NEORV32_HOME)/sw/lib/source
 # Path to NEORV32 executable generator
 NEORV32_EXG_PATH = $(NEORV32_HOME)/sw/image_gen
 # Path to NEORV32 rtl folder
-# NEORV32_RTL_PATH = $(NEORV32_HOME)/rtl
-NEORV32_RTL_PATH = $(NEORV32_HOME)/ip/neorv32
+NEORV32_RTL_PATH = $(NEORV32_HOME)/rtl
 # Path to NEORV32 sim folder
 NEORV32_SIM_PATH = $(NEORV32_HOME)/sim
 
@@ -237,7 +236,7 @@ $(BIN_MAIN): $(APP_ELF) | $(BUILD_DIR)
 $(APP_EXE): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_EXE)"
-	$(Q)$(IMAGE_GEN) -app_bin $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t app_bin -i $< -o $@
 	$(ECHO) "Executable size in bytes:"
 	$(Q)$(WC) -c < $(APP_EXE)
 
@@ -245,37 +244,37 @@ $(APP_EXE): $(BIN_MAIN) $(IMAGE_GEN)
 $(APP_VHD): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_VHD)"
-	$(Q)$(IMAGE_GEN) -app_vhd $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t app_vhd -i $< -o $@
 
 # Generate NEORV32 RAW executable image in plain hex format
 $(APP_HEX): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_HEX)"
-	$(Q)$(IMAGE_GEN) -raw_hex $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t raw_hex -i $< -o $@
 
 # Generate NEORV32 RAW executable image in binary format
 $(APP_BIN): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_BIN)"
-	$(Q)$(IMAGE_GEN) -raw_bin $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t raw_bin -i $< -o $@
 
 # Generate NEORV32 RAW executable image in COE format
 $(APP_COE): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_COE)"
-	$(Q)$(IMAGE_GEN) -raw_coe $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t raw_coe -i $< -o $@
 
 # Generate NEORV32 RAW executable image in MIF format
 $(APP_MIF): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_MIF)"
-	$(Q)$(IMAGE_GEN) -raw_mif $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t raw_mif -i $< -o $@
 
 # Generate NEORV32 RAW executable image in MEM format
 $(APP_MEM): $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(APP_MEM)"
-	$(Q)$(IMAGE_GEN) -raw_mem $< $@ $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t raw_mem -i $< -o $@
 
 # -----------------------------------------------------------------------------
 # BOOTROM / bootloader image targets
@@ -285,7 +284,7 @@ $(APP_MEM): $(BIN_MAIN) $(IMAGE_GEN)
 bl_image: $(BIN_MAIN) $(IMAGE_GEN)
 	$(Q)$(SET) -e
 	$(ECHO) "Generating $(BOOT_VHD)"
-	$(Q)$(IMAGE_GEN) -bld_vhd $< $(BOOT_VHD) $(shell basename $(CURDIR))
+	$(Q)$(IMAGE_GEN) -t bld_vhd -i $< -o $(BOOT_VHD)
 
 # Install BOOTROM image to VHDL source directory
 bootloader: bl_image
@@ -351,19 +350,33 @@ clean_all: clean
 # -----------------------------------------------------------------------------
 
 check: $(IMAGE_GEN)
-	$(ECHO) "---------------- $(CC) ----------------"
+	$(ECHO) "******************************************************"
+	$(ECHO) $(CC)
+	$(ECHO) "******************************************************"
 	$(Q)$(CC) -v
-	$(ECHO) "---------------- $(OBJDUMP) ----------------"
+	$(ECHO) "******************************************************"
+	$(ECHO) $(OBJDUMP)
+	$(ECHO) "******************************************************"
 	$(Q)$(OBJDUMP) -V
-	$(ECHO) "---------------- $(OBJCOPY) ----------------"
+	$(ECHO) "******************************************************"
+	$(ECHO) $(OBJCOPY)
+	$(ECHO) "******************************************************"
 	$(Q)$(OBJCOPY) -V
-	$(ECHO) "---------------- $(READELF) ----------------"
+	$(ECHO) "******************************************************"
+	$(ECHO) $(READELF)
+	$(ECHO) "******************************************************"
 	$(Q)$(READELF) -v
-	$(ECHO) "---------------- $(SIZE) ----------------"
+	$(ECHO) "******************************************************"
+	$(ECHO) $(SIZE)
+	$(ECHO) "******************************************************"
 	$(Q)$(SIZE) -V
-	$(ECHO) "---------------- NEORV32 image_gen ----------------"
-	$(Q)$(IMAGE_GEN) -help
-	$(ECHO) "---------------- Native GCC ----------------"
+	$(ECHO) "******************************************************"
+	$(ECHO) "NEORV32 image generator:" $(IMAGE_GEN)
+	$(ECHO) "******************************************************"
+	$(Q)$(IMAGE_GEN) -h
+	$(ECHO) "******************************************************"
+	$(ECHO) "Native GCC:" $(CC_HOST)
+	$(ECHO) "******************************************************"
 	$(Q)$(CC_HOST) -v
 	$(ECHO) ""
 	$(ECHO) "Toolchain check OK"
@@ -376,7 +389,6 @@ info:
 	$(ECHO) "******************************************************"
 	$(ECHO) "Project / Makefile Configuration"
 	$(ECHO) "******************************************************"
-	$(ECHO) "Project folder: $(shell basename $(CURDIR))"
 	$(ECHO) "Source files: $(APP_SRC)"
 	$(ECHO) "Include folder(s): $(APP_INC)"
 	$(ECHO) "ASM include folder(s): $(ASM_INC)"
@@ -407,6 +419,11 @@ info:
 	$(ECHO) "GHDL_RUN_FLAGS: $(GHDL_RUN_FLAGS)"
 	$(ECHO) "USER_FLAGS: $(USER_FLAGS)"
 	$(ECHO) "CC_FLAGS: $(CC_FLAGS)"
+	$(ECHO) ""
+	$(ECHO) "******************************************************"
+	$(ECHO) "RISC-V GCC ISA extensions"
+	$(ECHO) "******************************************************"
+	$(Q)$(CC) -march=help
 
 # -----------------------------------------------------------------------------
 # Help

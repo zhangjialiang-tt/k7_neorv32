@@ -176,11 +176,19 @@ extern char __heap_start[];    /**< heap start address */
 extern char __heap_end[];      /**< heap last address */
 extern char __crt0_max_heap[]; /**< heap size in bytes */
 extern char __crt0_entry[];    /**< crt0 entry point */
+extern char __crt0_rom_base[]; /**< ROM base address */
+extern char __crt0_rom_size[]; /**< ROM size in bytes */
+extern char __crt0_ram_base[]; /**< ROM base address */
+extern char __crt0_ram_size[]; /**< ROM size in bytes */
 // aliases
 #define NEORV32_HEAP_BEGIN ((uint32_t)&__heap_start[0])
 #define NEORV32_HEAP_END   ((uint32_t)&__heap_end[0])
 #define NEORV32_HEAP_SIZE  ((uint32_t)&__crt0_max_heap[0])
 #define NEORV32_CRT0_ENTRY ((uint32_t)&__crt0_entry[0])
+#define NEORV32_ROM_BASE   ((uint32_t)&__crt0_rom_base[0])
+#define NEORV32_ROM_SIZE   ((uint32_t)&__crt0_rom_size[0])
+#define NEORV32_RAM_BASE   ((uint32_t)&__crt0_ram_base[0])
+#define NEORV32_RAM_SIZE   ((uint32_t)&__crt0_ram_size[0])
 /**@}*/
 
 
@@ -229,33 +237,25 @@ typedef union {
 // ----------------------------------------------------------------------------
 // Include all processor header files
 // ----------------------------------------------------------------------------
-// intrinsics
-#include "neorv32_intrinsics.h"
-
-// helper functions
 #include "neorv32_aux.h"
-
-// CPU core
-#include "neorv32_cpu.h"
-#include "neorv32_cpu_csr.h"
-#include "neorv32_cpu_cfu.h"
-
-// NEORV32 runtime environment
-#include "neorv32_rte.h"
-#include "neorv32_smp.h"
-#include "neorv32_semihosting.h"
-
-// IO/peripheral devices
 #include "neorv32_cfs.h"
+#include "neorv32_cfu.h"
 #include "neorv32_clint.h"
+#include "neorv32_cpu.h"
+#include "neorv32_csr.h"
 #include "neorv32_dma.h"
 #include "neorv32_gpio.h"
 #include "neorv32_gptmr.h"
+#include "neorv32_intrinsics.h"
+#include "neorv32_legacy.h"
 #include "neorv32_neoled.h"
 #include "neorv32_onewire.h"
 #include "neorv32_pwm.h"
+#include "neorv32_rte.h"
+#include "neorv32_semihosting.h"
 #include "neorv32_sdi.h"
 #include "neorv32_slink.h"
+#include "neorv32_smp.h"
 #include "neorv32_spi.h"
 #include "neorv32_sysinfo.h"
 #include "neorv32_tracer.h"
@@ -264,9 +264,6 @@ typedef union {
 #include "neorv32_twi.h"
 #include "neorv32_uart.h"
 #include "neorv32_wdt.h"
-
-// Legacy wrappers
-#include "neorv32_legacy.h"
 
 #ifdef __cplusplus
 }

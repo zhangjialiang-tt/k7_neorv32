@@ -17,7 +17,7 @@
 /**********************************************************************//**
  * Simple delay function using busy-wait.
  *
- * @warning Timing is imprecise! Use CLINT.MTIME or CSR.[M]CYCLE[H] for precise timing.
+ * @warning Timing is imprecise! Use CLINT.MTIME or CYCLE CSRs for precise timing.
  *
  * @param[in] clock_hz CPU clock speed in Hz.
  * @param[in] time_ms Time in ms to wait (unsigned 32-bit).
@@ -299,7 +299,7 @@ void neorv32_aux_print_hw_config(void) {
 
   // general
   neorv32_uart0_printf("Is simulation:       ");
-  if (neorv32_cpu_csr_read(CSR_MXISA) & (1 << CSR_MXISA_IS_SIM)) { neorv32_uart0_printf("yes\n"); }
+  if (neorv32_cpu_csr_read(CSR_MXCSR) & (1 << CSR_MXCSR_ISSIM)) { neorv32_uart0_printf("yes\n"); }
   else { neorv32_uart0_printf("no\n"); }
 
   neorv32_uart0_printf("CPU cores (harts):   %u\n", neorv32_sysinfo_get_numcores());
@@ -309,15 +309,13 @@ void neorv32_aux_print_hw_config(void) {
   neorv32_uart0_printf("On-chip debugger:    ");
   if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_OCD)) {
     neorv32_uart0_printf("enabled");
+    if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_OCD_AUTH)) {
+      neorv32_uart0_printf(" + authentication");
+    }
+    neorv32_uart0_printf(", %u HW trigger(s)\n", neorv32_cpu_hwtrig_get_number());
   }
   else {
-    neorv32_uart0_printf("disabled");
-  }
-  if (NEORV32_SYSINFO->SOC & (1 << SYSINFO_SOC_OCD_AUTH)) {
-    neorv32_uart0_printf(" + authentication\n");
-  }
-  else {
-    neorv32_uart0_printf("\n");
+    neorv32_uart0_printf("disabled\n");
   }
 
   // IDs
@@ -360,6 +358,7 @@ void neorv32_aux_print_hw_config(void) {
   if (tmp & (1<<CSR_MXISA_SMPMP))     { neorv32_uart0_printf("Smpmp ");     }
   if (tmp & (1<<CSR_MXISA_ZAAMO))     { neorv32_uart0_printf("Zaamo ");     }
   if (tmp & (1<<CSR_MXISA_ZALRSC))    { neorv32_uart0_printf("Zalrsc ");    }
+  if (tmp & (1<<CSR_MXISA_ZCA))       { neorv32_uart0_printf("Zca ");       }
   if (tmp & (1<<CSR_MXISA_ZCB))       { neorv32_uart0_printf("Zcb ");       }
   if (tmp & (1<<CSR_MXISA_ZBA))       { neorv32_uart0_printf("Zba ");       }
   if (tmp & (1<<CSR_MXISA_ZBB))       { neorv32_uart0_printf("Zbb ");       }
@@ -368,6 +367,7 @@ void neorv32_aux_print_hw_config(void) {
   if (tmp & (1<<CSR_MXISA_ZBKX))      { neorv32_uart0_printf("Zbkx ");      }
   if (tmp & (1<<CSR_MXISA_ZBS))       { neorv32_uart0_printf("Zbs ");       }
   if (tmp & (1<<CSR_MXISA_ZFINX))     { neorv32_uart0_printf("Zfinx ");     }
+  if (tmp & (1<<CSR_MXISA_ZIBI))      { neorv32_uart0_printf("Zibi ");      }
   if (tmp & (1<<CSR_MXISA_ZICNTR))    { neorv32_uart0_printf("Zicntr ");    }
   if (tmp & (1<<CSR_MXISA_ZICOND))    { neorv32_uart0_printf("Zicond ");    }
   if (tmp & (1<<CSR_MXISA_ZICSR))     { neorv32_uart0_printf("Zicsr ");     }
@@ -383,11 +383,15 @@ void neorv32_aux_print_hw_config(void) {
   if (tmp & (1<<CSR_MXISA_ZKT))       { neorv32_uart0_printf("Zkt ");       }
   if (tmp & (1<<CSR_MXISA_ZMMUL))     { neorv32_uart0_printf("Zmmul ");     }
   if (tmp & (1<<CSR_MXISA_ZXCFU))     { neorv32_uart0_printf("Zxcfu ");     }
+
   // CPU tuning options
+  tmp = neorv32_cpu_csr_read(CSR_MXCSR);
   neorv32_uart0_printf("\nTuning options:      ");
-  if (tmp & (1<<CSR_MXISA_FASTMUL))   { neorv32_uart0_printf("fast_mul ");   }
-  if (tmp & (1<<CSR_MXISA_FASTSHIFT)) { neorv32_uart0_printf("fast_shift "); }
-  if (tmp & (1<<CSR_MXISA_RFHWRST))   { neorv32_uart0_printf("rf_hw_rst ");  }
+  if (tmp & (1<<CSR_MXCSR_TRACE))     { neorv32_uart0_printf("trace ");      }
+  if (tmp & (1<<CSR_MXCSR_CONSTTBR))  { neorv32_uart0_printf("constt_br ");  }
+  if (tmp & (1<<CSR_MXCSR_FASTMUL))   { neorv32_uart0_printf("fast_mul ");   }
+  if (tmp & (1<<CSR_MXCSR_FASTSHIFT)) { neorv32_uart0_printf("fast_shift "); }
+  if (tmp & (1<<CSR_MXCSR_RFHWRST))   { neorv32_uart0_printf("rf_hw_rst ");  }
 
   // check physical memory protection
   neorv32_uart0_printf("\nPhys. Memory Prot.:  ");
@@ -513,6 +517,10 @@ void neorv32_aux_print_hw_config(void) {
   else {
     neorv32_uart0_printf("\n");
   }
+
+  // bus timeouts
+  neorv32_uart0_printf("Bus timeout (int):   %u cycles\n", neorv32_sysinfo_get_extbustimeout());
+  neorv32_uart0_printf("Bus timeout (ext):   %u cycles\n", neorv32_sysinfo_get_extbustimeout());
 
   // peripherals
   neorv32_uart0_printf("Peripherals:         ");
