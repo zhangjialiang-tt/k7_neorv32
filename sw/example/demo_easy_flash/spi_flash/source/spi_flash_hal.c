@@ -56,14 +56,14 @@ static void spi_flash_hal_send_addr(uint32_t address) {
     neorv32_spi_transfer(addr.uint8[1]);
     neorv32_spi_transfer(addr.uint8[0]);
 #elif (SPI_FLASH_HAL_ADDR_BYTES == 4)
-    neorv32_spi_transfer((address >> 24) & 0xFF);
-    neorv32_spi_transfer((address >> 16) & 0xFF);
-    neorv32_spi_transfer((address >> 8) & 0xFF);
-    neorv32_spi_transfer(address & 0xFF);
-    // neorv32_spi_transfer(addr.uint8[3]);
-    // neorv32_spi_transfer(addr.uint8[2]);
-    // neorv32_spi_transfer(addr.uint8[1]);
-    // neorv32_spi_transfer(addr.uint8[0]);
+    // neorv32_spi_transfer((address >> 24) & 0xFF);
+    // neorv32_spi_transfer((address >> 16) & 0xFF);
+    // neorv32_spi_transfer((address >> 8) & 0xFF);
+    // neorv32_spi_transfer(address & 0xFF);
+    neorv32_spi_transfer(addr.uint8[3]);
+    neorv32_spi_transfer(addr.uint8[2]);
+    neorv32_spi_transfer(addr.uint8[1]);
+    neorv32_spi_transfer(addr.uint8[0]);
 #else
     #error "Invalid SPI_FLASH_HAL_ADDR_BYTES configuration!"
 #endif
@@ -75,18 +75,18 @@ static void spi_flash_hal_send_addr(uint32_t address) {
  * 
  * @return SPI flash bank address register value
  */
-static uint8_t spi_flash_hal_read_bank_addr_reg(void) {
-    if (!neorv32_spi_available()) {
-        return 0xFF; // 返回错误值
-    }
+// static uint8_t spi_flash_hal_read_bank_addr_reg(void) {
+//     if (!neorv32_spi_available()) {
+//         return 0xFF; // 返回错误值
+//     }
     
-    neorv32_spi_cs_en(SPI_FLASH_HAL_CS);
-    neorv32_spi_transfer(0x16); // Bank Register Read (BRRD) command
-    uint8_t res = neorv32_spi_transfer(0);
-    neorv32_spi_cs_dis();
+//     neorv32_spi_cs_en(SPI_FLASH_HAL_CS);
+//     neorv32_spi_transfer(0x16); // Bank Register Read (BRRD) command
+//     uint8_t res = neorv32_spi_transfer(0);
+//     neorv32_spi_cs_dis();
     
-    return res;
-}
+//     return res;
+// }
 /**
  * @brief Read flash status register.
  * 
@@ -100,7 +100,7 @@ static uint8_t spi_flash_hal_read_status_reg(void) {
     neorv32_spi_cs_en(SPI_FLASH_HAL_CS);
     neorv32_spi_transfer(SPI_FLASH_CMD_READ_STATUS);
     uint8_t res = neorv32_spi_transfer(0);
-    uint8_t res2 = neorv32_spi_transfer(0);
+    // uint8_t res2 = neorv32_spi_transfer(0);
     neorv32_spi_cs_dis();
 
 
@@ -161,25 +161,26 @@ int spi_flash_hal_init(void) {
     neorv32_spi_transfer(0x17); // WRAR command
     neorv32_spi_transfer(0x80); // Data to set EXTADD=1
     neorv32_spi_cs_dis();
-
-    neorv32_uart0_printf("[HAL_INIT] Waiting for register write to complete...\n");
-    if (spi_flash_hal_wait_ready(100) != 0) { // 100ms timeout for register write
-        neorv32_uart0_printf("[HAL_INIT] Timeout waiting for WIP to clear after BRWR!\n");
+    
+    spi_flash_hal_wait_ready(100);
+    // neorv32_uart0_printf("[HAL_INIT] Waiting for register write to complete...\n");
+    // if (spi_flash_hal_wait_ready(100) != 0) { // 100ms timeout for register write
+        // neorv32_uart0_printf("[HAL_INIT] Timeout waiting for WIP to clear after BRWR!\n");
         // 即使超时也继续，看看寄存器的值
-    }
+    // }
 
     // 步骤 3: 读回银行地址寄存器进行验证
-    neorv32_uart0_printf("[HAL_INIT] Reading back Bank Address Register...\n");
-    uint8_t bank_reg_after = spi_flash_hal_read_bank_addr_reg();
-    neorv32_uart0_printf("[HAL_INIT] BAR value after write: 0x%x\n", bank_reg_after);
+    // neorv32_uart0_printf("[HAL_INIT] Reading back Bank Address Register...\n");
+    // uint8_t bank_reg_after = spi_flash_hal_read_bank_addr_reg();
+    // neorv32_uart0_printf("[HAL_INIT] BAR value after write: 0x%x\n", bank_reg_after);
 
     // 检查EXTADD位是否真的被设置了
-    if ((bank_reg_after & 0x80) == 0) {
-        neorv32_uart0_printf("[HAL_INIT] CRITICAL ERROR: Failed to set EXTADD bit! 4-byte mode is NOT active.\n");
-        // 暂时不返回错误，让测试继续失败，以收集更多信息
-    } else {
-        neorv32_uart0_printf("[HAL_INIT] SUCCESS: EXTADD bit is set. 4-byte mode should be active.\n");
-    }
+    // if ((bank_reg_after & 0x80) == 0) {
+    //     neorv32_uart0_printf("[HAL_INIT] CRITICAL ERROR: Failed to set EXTADD bit! 4-byte mode is NOT active.\n");
+    //     // 暂时不返回错误，让测试继续失败，以收集更多信息
+    // } else {
+    //     neorv32_uart0_printf("[HAL_INIT] SUCCESS: EXTADD bit is set. 4-byte mode should be active.\n");
+    // }
 
 
 

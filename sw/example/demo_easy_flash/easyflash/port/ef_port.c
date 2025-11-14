@@ -28,10 +28,15 @@
 
 #include <easyflash.h>
 #include <stdarg.h>
+#include <neorv32.h>
+#include "../../spi_flash/include/spi_flash_hal.h"
+
+static uint32_t ef_mie_state = 0;
 
 /* default environment variables set for user */
 static const ef_env default_env_set[] = {
-
+    {"dev", "neorv32", 0},
+    {"app", "easyflash_demo", 0}
 };
 
 /**
@@ -44,6 +49,10 @@ static const ef_env default_env_set[] = {
  */
 EfErrCode ef_port_init(ef_env const **default_env, size_t *default_env_size) {
     EfErrCode result = EF_NO_ERR;
+
+    if (spi_flash_hal_init() != 0) {
+        return EF_ENV_INIT_FAILED;
+    }
 
     *default_env = default_env_set;
     *default_env_size = sizeof(default_env_set) / sizeof(default_env_set[0]);
@@ -63,8 +72,12 @@ EfErrCode ef_port_init(ef_env const **default_env, size_t *default_env_size) {
  */
 EfErrCode ef_port_read(uint32_t addr, uint32_t *buf, size_t size) {
     EfErrCode result = EF_NO_ERR;
-
-    /* You can add your code under here. */
+    if (spi_flash_hal_wait_ready(1000) != 0) {
+        return EF_READ_ERR;
+    }
+    if (spi_flash_hal_read(addr, (uint8_t*)buf, (uint32_t)size) != 0) {
+        result = EF_READ_ERR;
+    }
 
     return result;
 }
@@ -84,8 +97,24 @@ EfErrCode ef_port_erase(uint32_t addr, size_t size) {
 
     /* make sure the start address is a multiple of EF_ERASE_MIN_SIZE */
     EF_ASSERT(addr % EF_ERASE_MIN_SIZE == 0);
-
-    /* You can add your code under here. */
+    if (spi_flash_hal_wait_ready(1000) != 0) {
+        return EF_ERASE_ERR;
+    }
+    uint32_t start = addr;
+    uint32_t end = addr + (uint32_t)size;
+    while (start < end) {
+        if (((start % 65536u) == 0) && (end - start) >= 65536u) {
+            if (spi_flash_hal_erase_block(start, 65536u) != 0) {
+                return EF_ERASE_ERR;
+            }
+            start += 65536u;
+        } else {
+            if (spi_flash_hal_erase_sector(start) != 0) {
+                return EF_ERASE_ERR;
+            }
+            start += EF_ERASE_MIN_SIZE;
+        }
+    }
 
     return result;
 }
@@ -102,8 +131,13 @@ EfErrCode ef_port_erase(uint32_t addr, size_t size) {
  */
 EfErrCode ef_port_write(uint32_t addr, const uint32_t *buf, size_t size) {
     EfErrCode result = EF_NO_ERR;
-    
-    /* You can add your code under here. */
+    EF_ASSERT(size % 4 == 0);
+    if (spi_flash_hal_wait_ready(1000) != 0) {
+        return EF_WRITE_ERR;
+    }
+    if (spi_flash_hal_program(addr, (const uint8_t*)buf, (uint32_t)size) != 0) {
+        result = EF_WRITE_ERR;
+    }
 
     return result;
 }
@@ -112,18 +146,15 @@ EfErrCode ef_port_write(uint32_t addr, const uint32_t *buf, size_t size) {
  * lock the ENV ram cache
  */
 void ef_port_env_lock(void) {
-    
-    /* You can add your code under here. */
-    
+    ef_mie_state = neorv32_cpu_csr_read(CSR_MIE);
+    neorv32_cpu_csr_clr(CSR_MIE, (uint32_t)-1);
 }
 
 /**
  * unlock the ENV ram cache
  */
 void ef_port_env_unlock(void) {
-    
-    /* You can add your code under here. */
-    
+    neorv32_cpu_csr_write(CSR_MIE, ef_mie_state);
 }
 
 
@@ -145,8 +176,8 @@ void ef_log_debug(const char *file, const long line, const char *format, ...) {
     /* args point to the first variable parameter */
     va_start(args, format);
 
-    /* You can add your code under here. */
-    
+    neorv32_uart0_printf("[EF][%s:%ld] ", file, line);
+    neorv32_uart_vprintf(NEORV32_UART0,format, args);
     va_end(args);
 
 #endif
@@ -165,8 +196,7 @@ void ef_log_info(const char *format, ...) {
     /* args point to the first variable parameter */
     va_start(args, format);
 
-    /* You can add your code under here. */
-    
+    neorv32_uart_vprintf(NEORV32_UART0,format, args);
     va_end(args);
 }
 /**
@@ -181,7 +211,6 @@ void ef_print(const char *format, ...) {
     /* args point to the first variable parameter */
     va_start(args, format);
 
-    /* You can add your code under here. */
-    
+    neorv32_uart_vprintf(NEORV32_UART0,format, args);
     va_end(args);
 }
