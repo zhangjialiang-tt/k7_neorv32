@@ -86,6 +86,13 @@ BOOTLOADER_BIT := ${VITIS_WORKSPACE_DIR_2}/Bootloader/_ide/bitstream/${PROJECT_N
 MMI_FILE := ${PROJECT_DIR}/${PROJECT_NAME}.runs/memory.mmi
 MERGE_PROC := u_microblaze/u_risv_soc/design_1_i/microblaze_0
 
+# NEORV32 Software Variables
+NEORV32_SW_DIR := sw/example/demo_spi_flash
+NEORV32_TERMINAL := scripts/terminal.py
+NEORV32_EXE_FILE := ${NEORV32_SW_DIR}/neorv32_exe.bin
+NEORV32_PORT ?= COM4
+NEORV32_BAUDRATE ?= 19200
+
 # --- Program ELF and merged bit file to Flash ---
 FLASH_ELF := ${ELF_FILE}
 FLASH_BIT := ${DOWNLOAD_BIT}
@@ -99,7 +106,7 @@ FLASH_TYPE := mx25l25645g-spi-x1_x2_x4
 FLASH_ELF_OFFSET := 0x00800000
 FLASH_BIT_OFFSET := 0
 # Phony targets
-.PHONY: all build_hw synth impl bitstream export_hw program create_sw_platform create_app_project build_sw download_all run_sw clean open_project vivado open_vitis_ide help program_bit program_elf erase_flash print_cpu_cores
+.PHONY: all build_hw synth impl bitstream export_hw program create_sw_platform create_app_project build_sw download_all run_sw clean open_project vivado open_vitis_ide help program_bit program_elf erase_flash print_cpu_cores neorv32_build neorv32_upload neorv32_upload_interactive
 
 # --- Targets ---
 
@@ -290,6 +297,36 @@ print_cpu_cores:
 	${VIVADO} -mode batch -source ${SCRIPT_DIR}/get_cpu_core.tcl
 	@echo "INFO: CPU core count detection finished."
 
+# --- NEORV32 Software Targets ---
+
+# Build NEORV32 software application
+neorv32_build:
+	@echo "INFO: Building NEORV32 software application..."
+	@cd ${NEORV32_SW_DIR} && make exe
+	@echo "INFO: NEORV32 software build completed."
+	@echo "INFO: Generated executable: ${NEORV32_EXE_FILE}"
+
+# Upload NEORV32 software via bootloader (automatic mode)
+neorv32_upload:
+	@echo "INFO: Uploading NEORV32 software to ${NEORV32_PORT} (baudrate: ${NEORV32_BAUDRATE})..."
+	python ${NEORV32_TERMINAL} -p ${NEORV32_PORT} -b ${NEORV32_BAUDRATE} -f ${NEORV32_EXE_FILE}
+	@echo "INFO: NEORV32 software upload completed."
+
+# Upload NEORV32 software and enter interactive mode
+neorv32_upload_interactive: neorv32_build
+	@echo "INFO: Uploading NEORV32 software to ${NEORV32_PORT} (baudrate: ${NEORV32_BAUDRATE}) with interactive mode..."
+	python ${NEORV32_TERMINAL} -p ${NEORV32_PORT} -b ${NEORV32_BAUDRATE} -f ${NEORV32_EXE_FILE} -a
+	@echo "INFO: NEORV32 software upload and interactive session completed."
+
+# Interactive terminal mode only (no upload)
+neorv32_terminal:
+	@echo "INFO: Starting NEORV32 interactive terminal on ${NEORV32_PORT} (baudrate: ${NEORV32_BAUDRATE})..."
+	python ${NEORV32_TERMINAL} -p ${NEORV32_PORT} -b ${NEORV32_BAUDRATE} -i
+
+# List available serial ports
+neorv32_list_ports:
+	@echo "INFO: Listing available serial ports..."
+	python ${NEORV32_TERMINAL} --list-ports
 
 # Clean generated files
 clean:
@@ -357,13 +394,25 @@ help:
 	@echo "  make open_project 或 make v - 使用 GUI 模式打开 Vivado 工程"
 	@echo "  make open_vitis_ide 或 make vi - 使用 GUI 模式打开 Vitis 工作区"
 	@echo "  make print_cpu_cores    - 打印 Vivado 可用的 CPU 核心数"
-	@echo "  make help               - 显示此帮助信息"
+	@echo ""
+	@echo "NEORV32 软件相关目标:"
+	@echo "  make neorv32_build      - 编译 NEORV32 软件应用程序，生成 neorv32_exe.bin"
+	@echo "  make neorv32_upload     - 编译并上传 NEORV32 软件到开发板 (自动模式)"
+	@echo "  make neorv32_upload_interactive - 编译并上传 NEORV32 软件，上传后进入交互模式"
+	@echo "  make neorv32_terminal   - 启动 NEORV32 交互式终端 (不上传文件)"
+	@echo "  make neorv32_list_ports - 列出可用的串口设备"
 	@echo ""
 	@echo "可覆盖变量:"
-	@echo "  PROJECT_NAME (默认: PTRW022)"
-	@echo "  PART_NAME (默认: xc7a200tfbg484-2)"
+	@echo "  PROJECT_NAME (默认: k7_neorv32)"
+	@echo "  PART_NAME (默认: xc7k325tffg900-2)"
 	@echo "  BLOCK_DESIGN_NAME (默认: design_1)"
 	@echo "  MEMORY_INTERFACE (默认: SPIx4)"
 	@echo "  MEMORY_SIZE (默认: 16)"
 	@echo "  VIVADO (默认: vivado)"
+	@echo "  NEORV32_PORT (默认: COM3) - NEORV32 串口端口"
+	@echo "  NEORV32_BAUDRATE (默认: 115200) - NEORV32 串口波特率"
+	@echo ""
+	@echo "NEORV32 使用示例:"
+	@echo "  make neorv32_upload NEORV32_PORT=COM4 - 使用 COM4 端口上传程序"
+	@echo "  make neorv32_upload_interactive NEORV32_BAUDRATE=9600 - 使用 9600 波特率上传并进入交互模式"
 	@echo ""

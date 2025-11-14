@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 import serial
 import serial.tools.list_ports
 import threading
@@ -148,8 +150,8 @@ class SerialTerminal:
                 self.bootloader_state = 1
                 
         elif self.bootloader_state == 1:
-            # 等待命令菜单
-            if "available cmds:" in lowercase_data:
+            # 等待命令菜单 - 检测多种可能的命令提示符
+            if "available cmds:" in lowercase_data or "cmd:>" in lowercase_data or "type 'h' for help" in lowercase_data:
                 print("\n[Bootloader] 检测到命令菜单，发送'u'命令上传文件...")
                 time.sleep(0.1)
                 self.send_data('u')
@@ -253,8 +255,87 @@ class SerialTerminal:
         try:
             # 保持运行直到用户中断
             self.interactive = True
-            while self.running:
-                time.sleep(0.1)
+            
+            # 检测操作系统
+            import platform
+            is_windows = platform.system() == 'Windows'
+            
+            if not is_windows:
+                # Unix/Linux/Mac系统 - 使用termios实现字符级输入
+                import select
+                import termios
+                import tty
+                
+                # 保存终端设置
+                old_settings = termios.tcgetattr(sys.stdin)
+                try:
+                    # 设置为非阻塞模式
+                    tty.setraw(sys.stdin.fileno())
+                    
+                    while self.running:
+                        # 检查是否有输入可读
+                        if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
+                            # 读取用户输入
+                            char = sys.stdin.read(1)
+                            if char:
+                                # 发送到串口
+                                self.send_data(char)
+                                # 回显字符
+                                sys.stdout.write(char)
+                                sys.stdout.flush()
+                        
+                        time.sleep(0.01)
+                finally:
+                    # 恢复终端设置
+                    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+            else:
+                # Windows系统 - 使用msvcrt实现字符级输入
+                try:
+                    import msvcrt
+                    
+                    while self.running:
+                        # 检查是否有按键
+                        if msvcrt.kbhit():
+                            char = msvcrt.getch()
+                            # 处理特殊键
+                            if char == b'\x03':  # Ctrl+C
+                                raise KeyboardInterrupt
+                            
+                            # 解码字符
+                            try:
+                                char_str = char.decode('utf-8')
+                            except UnicodeDecodeError:
+                                # 对于某些特殊键，可能需要读取第二个字节
+                                if msvcrt.kbhit():
+                                    char += msvcrt.getch()
+                                try:
+                                    char_str = char.decode('utf-8')
+                                except UnicodeDecodeError:
+                                    char_str = char.decode('latin-1', errors='replace')
+                            
+                            # 发送到串口
+                            self.send_data(char_str)
+                            # 回显字符
+                            sys.stdout.write(char_str)
+                            sys.stdout.flush()
+                        
+                        time.sleep(0.01)
+                        
+                except ImportError:
+                    # 如果msvcrt不可用，回退到行输入模式
+                    print("\n[INFO] 使用简化输入模式（仅支持回车发送整行）")
+                    while self.running:
+                        try:
+                            # 使用input()读取整行输入
+                            line = input()
+                            if line:
+                                # 添加换行符并发送
+                                self.send_data(line + '\r\n')
+                        except EOFError:
+                            break
+                        except KeyboardInterrupt:
+                            break
+                
         except KeyboardInterrupt:
             print("\n收到中断信号")
         finally:
@@ -279,11 +360,14 @@ class SerialTerminal:
                 print("\n[INFO] 进入交互模式...")
                 self.run_interactive()
             elif self.bootloader_state == 3:  # 成功完成
-                print("[INFO] 按任意键进入交互模式，或按Ctrl+C退出...")
-                # 等待短时间看是否有按键
-                time.sleep(2)
+                print("[INFO] 程序上传完成，自动进入交互模式...")
+                print("[INFO] 按 Ctrl+C 退出程序")
+                # 自动进入交互模式
                 if self.running:
+                    self.interactive = True
                     self.run_interactive()
+            else:
+                print("[INFO] bootloader未完成，程序退出")
                     
         except KeyboardInterrupt:
             print("\n收到中断信号")
