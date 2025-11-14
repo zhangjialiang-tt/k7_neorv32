@@ -5,6 +5,13 @@ module top #(
 ) (
     // Clock: 50MHz
     input  wire         i_clk,
+
+    // output  wire         flash_sck,//spi_clk
+    (*mark_debug = "true"*)output  wire         flash_cs,//spi_csn
+    (*mark_debug = "true"*)output  wire         flash_dq0,//spi_mosi
+    (*mark_debug = "true"*)input   wire         flash_dq1,//spi_miso
+    output  wire          flash_dq2,
+    output  wire         flash_dq3,
     // output wire         o_cmos_reset1,  // cmos reset
     // output wire         o_cmos_scl1,    // cmos i2c clock
     // inout  wire         io_cmos_sda1,   // cmos i2c data
@@ -44,11 +51,11 @@ module top #(
     output      [  3:0] ddr3_dm,                //ddr3_dm
     output      [  0:0] ddr3_odt,               //ddr3_odt
 `endif
-    inout  wire         system_spi_0_io0_io   ,
-    inout  wire         system_spi_0_io1_io   ,
-    inout  wire         system_spi_0_io2_io   ,
-    inout  wire         system_spi_0_io3_io   ,
-    inout  wire         system_spi_0_ss_io    ,
+    // inout  wire         system_spi_0_io0_io   ,
+    // inout  wire         system_spi_0_io1_io   ,
+    // inout  wire         system_spi_0_io2_io   ,
+    // inout  wire         system_spi_0_io3_io   ,
+    // inout  wire         system_spi_0_ss_io    ,
     input  wire         system_uart_debug_rxd ,
     output wire         system_uart_debug_txd ,
     inout  wire         iic_sensor_scl        ,//adv7611
@@ -467,10 +474,12 @@ gpio—i：
         .IMEM_SIZE(16 * 1024),
         .DMEM_EN(1'b1),
         .DMEM_SIZE(8 * 1024),
-        .IO_GPIO_NUM(10),
+        .IO_GPIO_NUM(32),
         .IO_CLINT_EN(1'b1),
         .IO_UART0_EN(1'b1),
         .IO_UART1_EN(1'b1),
+        .IO_SPI_EN (1'b1),
+        .IO_SPI_FIFO (32),
         .IO_TWI_EN(1'b1)
     ) neorv32_top_inst (
         .clk_i      (clk_100m_int),
@@ -481,10 +490,15 @@ gpio—i：
         .twi_sda_o  (twi_sda_o),
         .twi_scl_i  (twi_scl_i),
         .twi_scl_o  (twi_scl_o),
+        .spi_clk_o  (flash_sck),
+        .spi_csn_o  (flash_cs),
+        .spi_dat_o  (flash_dq0),
+        .spi_dat_i  (flash_dq1),
         .uart0_txd_o(system_uart_debug_txd),
         .uart0_rxd_i(system_uart_debug_rxd)
     );
-
+assign flash_dq2 = 1'b1;
+assign flash_dq3 = 1'b1;
     // I2C MUX
     // Bus 0: iic_temp (EEPROM)
     // Bus 1: iic_sensor (adv7611)
@@ -501,5 +515,25 @@ gpio—i：
 
     // SCL input is just pass-through, as SCL is master-driven
     assign twi_scl_i = (i2c_bus_select == 1) ? iic_sensor_scl : iic_temp_scl;
+    //**********************************************************************************************
+// STARTUPE2原语实例化 - 控制Bank0的CCLK引脚
+STARTUPE2 #(
+    .PROG_USR("FALSE"),          // 是否使用加密比特流
+    .SIM_CCLK_FREQ(0.0)         // 仿真时钟频率(ns)
+) STARTUPE2_inst (
+    .CFGCLK(),                   // 配置主时钟输出（通常悬空）
+    .CFGMCLK(),                  // 内部振荡器时钟输出（通常悬空）
+    .EOS(),                      // 启动结束标志输出
+    .PREQ(),                     // 编程请求输出
+    .CLK(0),                     // 用户启动时钟输入（通常接地）
+    .GSR(0),                     // 全局复位输入（通常接地）
+    .GTS(0),                     // 全局三态输入（通常接地）
+    .KEYCLEARB(1),               // 密钥清除输入（通常接高）
+    .PACK(1),                    // 编程确认输入（通常接高）
+    .USRCCLKO(flash_sck),        // **关键：用户Flash时钟信号连接到这里**
+    .USRCCLKTS(0),               // CCLK三态控制（0=使能输出）
+    .USRDONEO(1),                // DONE引脚输出控制
+    .USRDONETS(1)                // DONE引脚三态控制
+);
     //**********************************************************************************************
 endmodule

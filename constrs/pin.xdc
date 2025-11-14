@@ -108,11 +108,11 @@ set_property -dict {PACKAGE_PIN Y26 IOSTANDARD LVCMOS33} [get_ports system_uart_
 #------------------- FLASH SPI ----------------------
 #--------- S25FL256SAGNFI00 --- 256Mbit -------------
 # set_property -dict {PACKAGE_PIN C8 IOSTANDARD LVCMOS33} [get_ports system_spi_0_clk_io]
-set_property -dict {PACKAGE_PIN U19 IOSTANDARD LVCMOS33} [get_ports system_spi_0_ss_io]
-set_property -dict {PACKAGE_PIN P24 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io0_io]
-set_property -dict {PACKAGE_PIN R25 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io1_io]
-set_property -dict {PACKAGE_PIN R20 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io2_io]
-set_property -dict {PACKAGE_PIN R21 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io3_io]
+# set_property -dict {PACKAGE_PIN U19 IOSTANDARD LVCMOS33} [get_ports system_spi_0_ss_io]
+# set_property -dict {PACKAGE_PIN P24 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io0_io]
+# set_property -dict {PACKAGE_PIN R25 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io1_io]
+# set_property -dict {PACKAGE_PIN R20 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io2_io]
+# set_property -dict {PACKAGE_PIN R21 IOSTANDARD LVCMOS33} [get_ports system_spi_0_io3_io]
 # I2C Pins (EEPROM - Page 16)
 set_property -dict {PACKAGE_PIN H30 IOSTANDARD LVCMOS33} [get_ports iic_sensor_sda]
 set_property -dict {PACKAGE_PIN F28 IOSTANDARD LVCMOS33} [get_ports iic_sensor_scl]
@@ -136,4 +136,11 @@ set_property -dict {PACKAGE_PIN AC30 IOSTANDARD LVCMOS33} [get_ports iic_temp_sc
 
 
 
+set_property -dict {PACKAGE_PIN P24 IOSTANDARD LVCMOS33} [get_ports flash_dq0]
+set_property -dict {PACKAGE_PIN R25 IOSTANDARD LVCMOS33} [get_ports flash_dq1]
+set_property -dict {PACKAGE_PIN R20 IOSTANDARD LVCMOS33} [get_ports flash_dq2]
+set_property -dict {PACKAGE_PIN R21 IOSTANDARD LVCMOS33} [get_ports flash_dq3]
+# set_property -dict {PACKAGE_PIN B10 IOSTANDARD LVCMOS33} [get_ports flash_sck]
+set_property -dict {PACKAGE_PIN U19 IOSTANDARD LVCMOS33} [get_ports flash_cs]
 
+set_property PULLUP true [get_ports flash_dq1]
