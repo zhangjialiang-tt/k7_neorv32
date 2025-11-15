@@ -27,17 +27,24 @@
  */
  
 #include <elog.h>
+#include <neorv32.h>
+#include <stdio.h>
 
 /**
  * EasyLogger port initialize
  *
  * @return result
  */
+static uint32_t g_prev_mie = 0;
+
 ElogErrCode elog_port_init(void) {
     ElogErrCode result = ELOG_NO_ERR;
-
-    /* add your code here */
-    
+    if (neorv32_uart0_available() == 0) {
+        return result;
+    }
+    neorv32_uart0_printf("EasyLogger port init...\n");
+    neorv32_uart0_setup(19200, 0);
+    neorv32_uart0_enable();
     return result;
 }
 
@@ -46,9 +53,9 @@ ElogErrCode elog_port_init(void) {
  *
  */
 void elog_port_deinit(void) {
-
-    /* add your code here */
-
+    if (neorv32_uart0_available()) {
+        neorv32_uart0_disable();
+    }
 }
 
 /**
@@ -58,27 +65,30 @@ void elog_port_deinit(void) {
  * @param size log size
  */
 void elog_port_output(const char *log, size_t size) {
-    
-    /* add your code here */
-    
+    if (log == NULL || size == 0) {
+        return;
+    }
+    for (size_t i = 0; i < size; i++) {
+        neorv32_uart0_putc(log[i]);
+    }
 }
 
 /**
  * output lock
  */
 void elog_port_output_lock(void) {
-    
-    /* add your code here */
-    
+    uint32_t mstatus = neorv32_cpu_csr_read(CSR_MSTATUS);
+    g_prev_mie = (mstatus >> CSR_MSTATUS_MIE) & 1U;
+    neorv32_cpu_csr_clr(CSR_MSTATUS, 1U << CSR_MSTATUS_MIE);
 }
 
 /**
  * output unlock
  */
 void elog_port_output_unlock(void) {
-    
-    /* add your code here */
-    
+    if (g_prev_mie) {
+        neorv32_cpu_csr_set(CSR_MSTATUS, 1U << CSR_MSTATUS_MIE);
+    }
 }
 
 /**
@@ -87,9 +97,17 @@ void elog_port_output_unlock(void) {
  * @return current time
  */
 const char *elog_port_get_time(void) {
-    
-    /* add your code here */
-    
+    static char time_str[24];
+    uint64_t t = neorv32_clint_time_get();
+    uint32_t clk = neorv32_sysinfo_get_clk();
+    uint64_t ms = (t * 1000ULL) / (uint64_t)clk;
+    uint32_t s = (uint32_t)(ms / 1000ULL);
+    uint32_t rem_ms = (uint32_t)(ms % 1000ULL);
+    int n = snprintf(time_str, sizeof(time_str), "%lu.%03lums", (unsigned long)s, (unsigned long)rem_ms);
+    if (n <= 0) {
+        time_str[0] = '\0';
+    }
+    return time_str;
 }
 
 /**
@@ -98,9 +116,8 @@ const char *elog_port_get_time(void) {
  * @return current process name
  */
 const char *elog_port_get_p_info(void) {
-    
-    /* add your code here */
-    
+    static const char pinfo[] = "hart0";
+    return pinfo;
 }
 
 /**
@@ -109,7 +126,6 @@ const char *elog_port_get_p_info(void) {
  * @return current thread name
  */
 const char *elog_port_get_t_info(void) {
-    
-    /* add your code here */
-    
+    static const char tinfo[] = "thd0";
+    return tinfo;
 }
