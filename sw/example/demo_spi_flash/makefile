@@ -23,7 +23,7 @@ USER_FLAGS += -Wl,--defsym,__neorv32_ram_size=8k
 #USER_FLAGS += -Wl,--defsym,__neorv32_heap_size=1k
 
 # Additional sources - only compile main.c, exclude HAL files
-APP_SRC = spi_flash_hal_test.c
+APP_SRC = main.c
 APP_SRC += hal/source/spi_flash_hal.c
 APP_INC += -I ./hal/include
 

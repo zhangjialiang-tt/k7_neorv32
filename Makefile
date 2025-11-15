@@ -87,7 +87,8 @@ MMI_FILE := ${PROJECT_DIR}/${PROJECT_NAME}.runs/memory.mmi
 MERGE_PROC := u_microblaze/u_risv_soc/design_1_i/microblaze_0
 
 # NEORV32 Software Variables
-NEORV32_SW_DIR := sw/example/demo_easy_flash
+# NEORV32_SW_DIR := sw/example/demo_easy_flash
+NEORV32_SW_DIR := sw/example/demo_spi_flash
 NEORV32_TERMINAL := scripts/terminal.py
 NEORV32_EXE_FILE := ${NEORV32_SW_DIR}/neorv32_exe.bin
 NEORV32_PORT ?= COM4
