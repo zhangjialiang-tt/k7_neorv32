@@ -328,11 +328,11 @@ module top #(
         .CLKOUT6_DUTY_CYCLE(0.5),
         .CLKOUT6_PHASE     (0),
 
-        .CLKFBOUT_MULT_F(8),       //Fvco = 100mhz*8=800mhz
+        .CLKFBOUT_MULT_F(16),       //Fvco = 50mhz*16=800mhz
         .CLKFBOUT_PHASE (0),
         .DIVCLK_DIVIDE  (1),
         .REF_JITTER1    (0.010),
-        .CLKIN1_PERIOD  (10.0),     //输入时钟周期-20ns
+        .CLKIN1_PERIOD  (20.0),     //输入时钟周期-20ns
         .STARTUP_WAIT   ("FALSE"),
         .CLKOUT4_CASCADE("FALSE")
     ) clk_mmcm_1_inst (

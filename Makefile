@@ -10,8 +10,8 @@
 #! Note: Do not add spaces after variable names
 PROJECT_NAME ?= k7_neorv32
 # Vivado Part
-PART_NAME ?= xc7k325tffg900-2#xc7k325tffg676-2#xc7a200tfbg900-2
-REAL_PART_NAME := xc7k325tffg900-2#$(firstword $(subst #, ,$(PART_NAME)))
+PART_NAME ?= xc7k325tffg676-2#xc7k325tffg676-2#xc7a200tfbg900-2
+REAL_PART_NAME := xc7k325tffg676-2#$(firstword $(subst #, ,$(PART_NAME)))
 DEBUG ?= xc7k325tffg676-2
 BLOCK_DESIGN_NAME ?= design_1
 # Vivado Executable (adjust if necessary)
@@ -22,7 +22,7 @@ SCRIPT_DIR := ./tcl
 PROJECT_DIR := ./${PROJECT_NAME}
 
 # --- Select TCL scripts based on PART_NAME ---
-ifeq ($(DEBUG),xc7k325tffg900-2)
+ifeq ($(DEBUG),xc7k325tffg676-2)
 	BUILD_BD_TCL := ${SCRIPT_DIR}/build_bd_ddr_standalone.tcl
 else
 	ifeq ($(REAL_PART_NAME),xc7k325tffg676-2)
