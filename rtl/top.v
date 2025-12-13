@@ -7,26 +7,27 @@ module top #(
     input  wire         i_clk,
 
     // output  wire         flash_sck,//spi_clk
-    (*mark_debug = "true"*)output  wire         flash_cs,//spi_csn
-    (*mark_debug = "true"*)output  wire         flash_dq0,//spi_mosi
-    (*mark_debug = "true"*)input   wire         flash_dq1,//spi_miso
-    output  wire          flash_dq2,
-    output  wire         flash_dq3,
-    // output wire         o_cmos_reset1,  // cmos reset
-    // output wire         o_cmos_scl1,    // cmos i2c clock
-    // inout  wire         io_cmos_sda1,   // cmos i2c data
-    // input  wire         i_cmos_pclk1,   // cmos pxiel clock
-    // input  wire         i_cmos_vsync1,  // cmos vsync
-    // input  wire         i_cmos_href1,   // cmos hsync refrence
-    // input  wire [8-1:0] i_cmos_data1,   // cmos data
+    // (*mark_debug = "true"*)output  wire         flash_cs,//spi_csn
+    // (*mark_debug = "true"*)output  wire         flash_dq0,//spi_mosi
+    // (*mark_debug = "true"*)input   wire         flash_dq1,//spi_miso
+    // output  wire          flash_dq2,
+    // output  wire         flash_dq3,
+    //CMOS摄像头接口信号
+    output wire         o_cmos_reset1,  // cmos reset
+    inout  wire         io_cmos_scl1,    // cmos i2c clock
+    inout  wire         io_cmos_sda1,   // cmos i2c data
+    input  wire         i_cmos_pclk1,   // cmos pxiel clock
+    input  wire         i_cmos_vsync1,  // cmos vsync
+    input  wire         i_cmos_href1,   // cmos hsync refrence
+    input  wire [8-1:0] i_cmos_data1,   // cmos data
 
-    // output wire         o_cmos_reset2,  // cmos reset
-    // output wire         o_cmos_scl2,    // cmos i2c clock
-    // inout  wire         io_cmos_sda2,   // cmos i2c data
-    // input  wire         i_cmos_pclk2,   // cmos pxiel clock
-    // input  wire         i_cmos_vsync2,  // cmos vsync
-    // input  wire         i_cmos_href2,   // cmos hsync refrence
-    // input  wire [8-1:0] i_cmos_data2,   //cmos data   
+    output wire         o_cmos_reset2,  // cmos reset
+    inout  wire         io_cmos_scl2,    // cmos i2c clock
+    inout  wire         io_cmos_sda2,   // cmos i2c data
+    input  wire         i_cmos_pclk2,   // cmos pxiel clock
+    input  wire         i_cmos_vsync2,  // cmos vsync
+    input  wire         i_cmos_href2,   // cmos hsync refrence
+    input  wire [8-1:0] i_cmos_data2,   //cmos data   
 
     //HDMI接口信号
     // output wire         o_TMDS1_CLK_P,
@@ -412,6 +413,29 @@ module top #(
         .rst(~mmcm_locked),
         .out(rst_160m_int)
     );
+//**********************************************************************************************
+//ov5640
+power_on_reset	#(
+    .CLK_FREQ_MHZ(50),
+    .PWR_DELAY_MS(5),
+    .RST_DELAY_MS(2)
+)power_on_reset_inst1
+    (
+	.clk            ( clk_50m_int         ),
+	.reset_n        ( ~rst_50m_int        ),	
+	.camera_rstn    ( o_cmos_reset1       ) //active low
+    );
+power_on_reset	#(
+    .CLK_FREQ_MHZ(50),
+    .PWR_DELAY_MS(5),
+    .RST_DELAY_MS(2)
+)power_on_reset_inst2
+    (
+	.clk            ( clk_50m_int         ),
+	.reset_n        ( ~rst_50m_int        ),	
+	.camera_rstn    ( o_cmos_reset2       ) //active low
+    );
+//**********************************************************************************************
 wire           [ 1  - 1 : 0 ]          o_Field_rst               ;
 reg           [ 1  - 1 : 0 ]          gpio_filed_int               ;
 always @ ( posedge clk_100m_int ) begin
@@ -490,50 +514,50 @@ gpio—i：
         .twi_sda_o  (twi_sda_o),
         .twi_scl_i  (twi_scl_i),
         .twi_scl_o  (twi_scl_o),
-        .spi_clk_o  (flash_sck),
-        .spi_csn_o  (flash_cs),
-        .spi_dat_o  (flash_dq0),
-        .spi_dat_i  (flash_dq1),
+        .spi_clk_o  (/*flash_sck*/),
+        .spi_csn_o  (/*flash_cs*/),
+        .spi_dat_o  (/*flash_dq0*/),
+        .spi_dat_i  (/*flash_dq1*/),
         .uart0_txd_o(system_uart_debug_txd),
         .uart0_rxd_i(system_uart_debug_rxd)
     );
-assign flash_dq2 = 1'b1;
-assign flash_dq3 = 1'b1;
+// assign flash_dq2 = 1'b1;
+// assign flash_dq3 = 1'b1;
     // I2C MUX
     // Bus 0: iic_temp (EEPROM)
     // Bus 1: iic_sensor (adv7611)
 
     // SCL and SDA output logic with tri-state buffers
-    assign iic_temp_scl   = (i2c_bus_select == 0) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
-    assign iic_temp_sda   = (i2c_bus_select == 0) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+    assign io_cmos_scl1   = (i2c_bus_select == 0) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
+    assign o_cmos_sda1   = (i2c_bus_select == 0) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
 
-    assign iic_sensor_scl = (i2c_bus_select == 1) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
-    assign iic_sensor_sda = (i2c_bus_select == 1) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+    assign io_cmos_scl2 = (i2c_bus_select == 1) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
+    assign o_cmos_sda2 = (i2c_bus_select == 1) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
 
     // SDA input logic
-    assign twi_sda_i = (i2c_bus_select == 1) ? iic_sensor_sda : iic_temp_sda;
+    assign twi_sda_i = (i2c_bus_select == 1) ? o_cmos_sda2 : o_cmos_sda1;
 
     // SCL input is just pass-through, as SCL is master-driven
-    assign twi_scl_i = (i2c_bus_select == 1) ? iic_sensor_scl : iic_temp_scl;
+    assign twi_scl_i = (i2c_bus_select == 1) ? io_cmos_scl2 : io_cmos_scl1;
     //**********************************************************************************************
 // STARTUPE2原语实例化 - 控制Bank0的CCLK引脚
-STARTUPE2 #(
-    .PROG_USR("FALSE"),          // 是否使用加密比特流
-    .SIM_CCLK_FREQ(0.0)         // 仿真时钟频率(ns)
-) STARTUPE2_inst (
-    .CFGCLK(),                   // 配置主时钟输出（通常悬空）
-    .CFGMCLK(),                  // 内部振荡器时钟输出（通常悬空）
-    .EOS(),                      // 启动结束标志输出
-    .PREQ(),                     // 编程请求输出
-    .CLK(0),                     // 用户启动时钟输入（通常接地）
-    .GSR(0),                     // 全局复位输入（通常接地）
-    .GTS(0),                     // 全局三态输入（通常接地）
-    .KEYCLEARB(1),               // 密钥清除输入（通常接高）
-    .PACK(1),                    // 编程确认输入（通常接高）
-    .USRCCLKO(flash_sck),        // **关键：用户Flash时钟信号连接到这里**
-    .USRCCLKTS(0),               // CCLK三态控制（0=使能输出）
-    .USRDONEO(1),                // DONE引脚输出控制
-    .USRDONETS(1)                // DONE引脚三态控制
-);
+// STARTUPE2 #(
+//     .PROG_USR("FALSE"),          // 是否使用加密比特流
+//     .SIM_CCLK_FREQ(0.0)         // 仿真时钟频率(ns)
+// ) STARTUPE2_inst (
+//     .CFGCLK(),                   // 配置主时钟输出（通常悬空）
+//     .CFGMCLK(),                  // 内部振荡器时钟输出（通常悬空）
+//     .EOS(),                      // 启动结束标志输出
+//     .PREQ(),                     // 编程请求输出
+//     .CLK(0),                     // 用户启动时钟输入（通常接地）
+//     .GSR(0),                     // 全局复位输入（通常接地）
+//     .GTS(0),                     // 全局三态输入（通常接地）
+//     .KEYCLEARB(1),               // 密钥清除输入（通常接高）
+//     .PACK(1),                    // 编程确认输入（通常接高）
+//     .USRCCLKO(flash_sck),        // **关键：用户Flash时钟信号连接到这里**
+//     .USRCCLKTS(0),               // CCLK三态控制（0=使能输出）
+//     .USRDONEO(1),                // DONE引脚输出控制
+//     .USRDONETS(1)                // DONE引脚三态控制
+// );
     //**********************************************************************************************
 endmodule

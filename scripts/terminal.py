@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 import serial
@@ -182,6 +181,38 @@ class SerialTerminal:
             if "crc passed" in lowercase_data or "executing" in lowercase_data:
                 print("\n[Bootloader] 程序执行成功!")
     
+    def _handle_interactive_upload(self):
+        """处理交互模式下的文件上传"""
+        if not self.exe_file:
+            print("[ERROR] 没有指定可执行文件")
+            return
+        
+        if not os.path.exists(self.exe_file):
+            print(f"[ERROR] 文件不存在: {self.exe_file}")
+            return
+        
+        # 启动bootloader模式
+        self.bootloader_active = True
+        self.bootloader_state = 0
+        self.bootloader_start_time = time.time()
+        print(f"[Bootloader] 启动上传模式，等待bootloader启动信息...")
+        print(f"[Bootloader] 请重启MCU或按复位键...")
+        print(f"[Bootloader] 超时时间: {self.bootloader_timeout}秒")
+        
+        # 等待bootloader完成
+        try:
+            while self.running and self.bootloader_active:
+                time.sleep(0.1)
+                
+            if self.bootloader_state == 3:  # 成功完成
+                print("[INFO] 文件上传完成，继续交互模式...")
+            else:
+                print("[ERROR] 文件上传失败")
+                
+        except KeyboardInterrupt:
+            print("\n[INFO] 上传被用户中断")
+            self.bootloader_active = False
+    
     def send_data(self, data):
         """发送数据"""
         if not self.connected:
@@ -244,6 +275,9 @@ class SerialTerminal:
         """运行交互式终端"""
         print("=== NEORV32 串口终端 ===")
         print("Ctrl+C 退出程序")
+        if self.exe_file:
+            print(f"[INFO] 检测到可执行文件: {self.exe_file}")
+            print("[INFO] 在交互模式下输入 'u' 可以上传文件")
         
         # 如果有默认参数，尝试自动连接
         if self.default_port and not self.connected:
@@ -278,11 +312,16 @@ class SerialTerminal:
                             # 读取用户输入
                             char = sys.stdin.read(1)
                             if char:
-                                # 发送到串口
-                                self.send_data(char)
-                                # 回显字符
-                                sys.stdout.write(char)
-                                sys.stdout.flush()
+                                # 检查是否输入了'u'字符
+                                if char.lower() == 'u' and self.exe_file:
+                                    print("\n[INFO] 检测到'u'命令，开始上传文件...")
+                                    self._handle_interactive_upload()
+                                else:
+                                    # 发送到串口
+                                    self.send_data(char)
+                                    # 回显字符
+                                    sys.stdout.write(char)
+                                    sys.stdout.flush()
                         
                         time.sleep(0.01)
                 finally:
@@ -313,22 +352,32 @@ class SerialTerminal:
                                 except UnicodeDecodeError:
                                     char_str = char.decode('latin-1', errors='replace')
                             
-                            # 发送到串口
-                            self.send_data(char_str)
-                            # 回显字符
-                            sys.stdout.write(char_str)
-                            sys.stdout.flush()
+                            # 检查是否输入了'u'字符
+                            if char_str.lower() == 'u' and self.exe_file:
+                                print("\n[INFO] 检测到'u'命令，开始上传文件...")
+                                self._handle_interactive_upload()
+                            else:
+                                # 发送到串口
+                                self.send_data(char_str)
+                                # 回显字符
+                                sys.stdout.write(char_str)
+                                sys.stdout.flush()
                         
                         time.sleep(0.01)
                         
                 except ImportError:
                     # 如果msvcrt不可用，回退到行输入模式
                     print("\n[INFO] 使用简化输入模式（仅支持回车发送整行）")
+                    if self.exe_file:
+                        print("[INFO] 输入 'u' 并按回车可以上传文件")
                     while self.running:
                         try:
                             # 使用input()读取整行输入
                             line = input()
-                            if line:
+                            if line.lower() == 'u' and self.exe_file:
+                                print("[INFO] 检测到'u'命令，开始上传文件...")
+                                self._handle_interactive_upload()
+                            elif line:
                                 # 添加换行符并发送
                                 self.send_data(line + '\r\n')
                         except EOFError:
