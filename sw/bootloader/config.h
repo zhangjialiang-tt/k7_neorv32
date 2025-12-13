@@ -34,7 +34,7 @@
 
 // UART0 baud rate
 #ifndef UART_BAUD
-#define UART_BAUD 19200
+#define UART_BAUD 115200
 #endif
 
 /**********************************************************************

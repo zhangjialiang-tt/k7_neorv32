@@ -471,7 +471,7 @@ debounce_v2 #(
 
     assign gpio_i = {30'd0,key_debounce,gpio_filed_int};
     assign o_led = gpio_o[2:0];
-    assign i2c_bus_select = gpio_o[9];
+    assign i2c_bus_select = 0;//gpio_o[9];
 /*
 外设说明：
 gpio—o：
@@ -529,13 +529,13 @@ gpio—i：
 
     // SCL and SDA output logic with tri-state buffers
     assign io_cmos_scl1   = (i2c_bus_select == 0) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
-    assign o_cmos_sda1   = (i2c_bus_select == 0) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+    assign io_cmos_sda1   = (i2c_bus_select == 0) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
 
     assign io_cmos_scl2 = (i2c_bus_select == 1) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
-    assign o_cmos_sda2 = (i2c_bus_select == 1) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+    assign io_cmos_sda2 = (i2c_bus_select == 1) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
 
     // SDA input logic
-    assign twi_sda_i = (i2c_bus_select == 1) ? o_cmos_sda2 : o_cmos_sda1;
+    assign twi_sda_i = (i2c_bus_select == 1) ? io_cmos_sda2 : io_cmos_sda1;
 
     // SCL input is just pass-through, as SCL is master-driven
     assign twi_scl_i = (i2c_bus_select == 1) ? io_cmos_scl2 : io_cmos_scl1;
