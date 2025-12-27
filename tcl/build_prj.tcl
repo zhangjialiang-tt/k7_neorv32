@@ -124,6 +124,7 @@ if {[llength [get_filesets -quiet sim_1]] == 0} {
 # so do NOT embed "${origin_dir}" literally inside the strings (which caused paths like ".../${origin_dir}/rtl/top.v")
 set rtl_files [list \
     [file join $origin_dir rtl top.v] \
+    [file join $origin_dir rtl common power_on_reset.v] \
     [file join $origin_dir rtl common DC_FIFO.v] \
     [file join $origin_dir rtl common capture_edge.v] \
     [file join $origin_dir rtl common gen_test.v] \
