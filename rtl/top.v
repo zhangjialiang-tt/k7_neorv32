@@ -15,7 +15,7 @@ module top #(
     //=============================================================================
     // Camera 1
     output wire       o_cmos_reset1,
-    inout  wire       io_cmos_scl1,
+    output wire       io_cmos_scl1,
     inout  wire       io_cmos_sda1,
     input  wire       i_cmos_pclk1,
     input  wire       i_cmos_vsync1,
@@ -179,6 +179,22 @@ module top #(
     wire [31:0] gpio_i;
     wire [31:0] gpio_o;
     (*mark_debug = "true"*)wire        cmos_reset_done;
+
+    // Wishbone bus signals
+    wire        wb_clk;
+    wire        wb_rst;
+    wire [31:0] wb_adr;
+    wire [31:0] wb_dat_o;
+    wire [31:0] wb_dat_i;
+    wire        wb_we;
+    wire [ 3:0] wb_sel;
+    wire        wb_stb;
+    wire        wb_cyc;
+    wire        wb_ack;
+
+    // Drive Wishbone clock and reset (Active-High reset for the wrapper)
+    assign wb_clk = clk_100m_int;
+    assign wb_rst = rst_100m_int;
 
     // GPIO Logic
     wire [ 4:0] key_debounce;
@@ -425,7 +441,10 @@ module top #(
         .IO_GPIO_NUM     (32),
         .IO_CLINT_EN     (1'b1),
         .IO_UART0_EN     (1'b1),
-        .IO_UART1_EN     (1'b1)
+        .IO_UART1_EN     (1'b1),
+        // External Bus Interface (XBUS)
+        .XBUS_EN         (1'b1),
+        .XBUS_TIMEOUT    (2048)
         // .IO_SPI_EN           (1'b1),
         // .IO_SPI_FIFO         (32),
         // .IO_TWI_EN           (0),
@@ -436,32 +455,67 @@ module top #(
         .gpio_i     (gpio_i),
         .gpio_o     (gpio_o),
         .uart0_txd_o(system_uart_debug_txd),
-        .uart0_rxd_i(system_uart_debug_rxd)
-        // Other interfaces like SPI are left unconnected (implicitly tied to Z)
+        .uart0_rxd_i(system_uart_debug_rxd),
+        // External Bus Interface (XBUS/Wishbone)
+        .xbus_adr_o (wb_adr),
+        .xbus_dat_o (wb_dat_o), // Master Data Out (Write)
+        .xbus_dat_i (wb_dat_i), // Master Data In (Read)
+        .xbus_we_o  (wb_we),
+        .xbus_sel_o (wb_sel),
+        .xbus_stb_o (wb_stb),
+        .xbus_cyc_o (wb_cyc),
+        .xbus_ack_i (wb_ack),
+        .xbus_err_i (1'b0)
     );
 
     //---------------------------------------------------------------------------
     // Interconnect Logic
     //---------------------------------------------------------------------------
-    // GPIO Input/Output Mapping for GPIO bit-bang I2C
-    // GPIO[8]  - I2C SDA (bidirectional - input/output)
-    // GPIO[9]  - I2C SCL (bidirectional - input/output)
-    // GPIO[10] - I2C Bus Select (0=Camera1, 1=Camera2)
+    // GPIO Input/Output Mapping
     assign o_led = gpio_o[31-:8];
-
-    // I2C Bus Multiplexing Logic using GPIO
-    // GPIO[10] selects which camera I2C bus is active
-    wire i2c_bus_select = gpio_o[10];
-    // 定义中间变量用于连接 IOBUF 的输出到 GPIO 输入
-    wire sda_in;
-    wire scl_in;
     assign gpio_i[31-:5] = key_debounce;
 
     // -------------------------------------------------------------------------
-    // 替换掉原来的 assign io_cmos_sda1 = ... 和 assign io_cmos_scl1 = ...
-    // 使用 Xilinx IOBUF 原语 (如果你使用的是其他厂商FPGA，请使用对应的原语或通用三态写法)
+    // SCCB/I2C Interface Wrapper Instantiation
     // -------------------------------------------------------------------------
+    wire wb_wrapper_sel;
+    wire wb_cyc_wrapper;
+    wire wb_stb_wrapper;
+    wire wrapper_scl;
 
+    // Address decoding: Select wrapper for addresses 0xF0000000 - 0xF000FFFF
+    assign wb_wrapper_sel = (wb_adr[31-:16] == 4'hF000);
+    assign wb_cyc_wrapper = wb_cyc && wb_wrapper_sel;
+    assign wb_stb_wrapper = wb_stb && wb_wrapper_sel;
+
+    // wb_ov5640_i2c_wrapper #(
+    //     .CLK_FREQ(100_000_000),
+    //     .I2C_FREQ(200_000)
+    // ) u_wb_ov5640_i2c (
+    //     // Wishbone Interface
+    //     .wb_clk_i(wb_clk),
+    //     .wb_rst_i(wb_rst),
+    //     .wb_stb_i(wb_stb_wrapper),
+    //     .wb_cyc_i(wb_cyc_wrapper),
+    //     .wb_we_i (wb_we),
+    //     .wb_dat_i(wb_dat_o), // Master Out -> Slave In
+    //     .wb_sel_i(wb_sel),
+    //     .wb_adr_i(wb_adr[4:2]),
+    //     .wb_dat_o(wb_dat_i), // Slave Out -> Master In
+    //     .wb_ack_o(wb_ack),
+
+    //     // External I2C Interface
+    //     .i2c_scl (wrapper_scl),
+    //     .i2c_sda (io_cmos_sda1)
+    // );
+
+    // Connect SCL to IO pin
+    assign io_cmos_scl1 = wrapper_scl;
+
+    // -------------------------------------------------------------------------
+    // Legacy GPIO I2C Logic (REMOVED/COMMENTED)
+    // -------------------------------------------------------------------------
+    /*
     // SDA IOBUF 实例化
     IOBUF #(
         .DRIVE(12),
@@ -472,11 +526,8 @@ module top #(
         .I (1'b0),          // Buffer Input -> 永远驱动 0
         .T (gpio_o[8])      // 3-state Enable -> 1=输入模式(高阻), 0=输出模式(驱动I即0)
     );
-    // 逻辑分析：
-    // 当 C代码 SCL_H() -> gpio_o[8]=1 -> T=1 -> IOBUF高阻态 (SDA被上拉电阻拉高) -> 符合预期
-    // 当 C代码 SCL_L() -> gpio_o[8]=0 -> T=0 -> IOBUF输出I(0) (SDA被强拉低)   -> 符合预期
 
-    // SCL IOBUF 实例化 (模拟I2C主机也建议通过IOBUF驱动以支持时钟延展或多主)
+    // SCL IOBUF 实例化
     IOBUF #(
         .DRIVE(12),
         .SLEW ("SLOW")
@@ -486,14 +537,12 @@ module top #(
         .I (1'b0),
         .T (gpio_o[9])
     );
+    */
 
-    // -------------------------------------------------------------------------
-    // 修改 gpio_i 的赋值，接入 IOBUF 的 .O 输出
-    // -------------------------------------------------------------------------
+    // Camera 2 I2C Bus - Currently Unused/Not Connected to Wrapper
+    assign io_cmos_sda2 = 1'bz;
+    assign io_cmos_scl2 = 1'bz;
 
-    // Camera 2 I2C Bus (selected when i2c_bus_select = 1)
-    // assign io_cmos_sda2 = (i2c_bus_select == 1'b1) ? ((gpio_o[8] == 1'b0) ? 1'b0 : 1'bz) : 1'bz;
-    // assign io_cmos_scl2 = (i2c_bus_select == 1'b1) ? ((gpio_o[9] == 1'b0) ? 1'b0 : 1'bz) : 1'bz;
 
     // Connect external I2C buses (Note: these are not used by neorv32 in this code)
     assign iic_sensor_scl = 1'bz;  // High-Z when not driven
