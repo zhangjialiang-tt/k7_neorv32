@@ -2,7 +2,7 @@
 module power_on_reset #(
     parameter CLK_FREQ_MHZ = 24,  // 假设时钟频率为24MHz
     parameter PWR_DELAY_MS = 5,   // 5ms上电延迟
-    parameter RST_DELAY_MS = 1.3  // 1.3ms复位延迟
+    parameter RST_DELAY_MS = 2  // 1.3ms复位延迟
 ) (
     input  wire clk,             // 时钟输入
     input  wire reset_n,         // 系统复位（低有效）

@@ -20,7 +20,7 @@ package neorv32_package is
 
   -- Architecture Constants -----------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  constant hw_version_c  : std_ulogic_vector(31 downto 0) := x"01120401"; -- hardware version
+  constant hw_version_c  : std_ulogic_vector(31 downto 0) := x"01120500"; -- hardware version
   constant archid_c      : natural := 19; -- official RISC-V architecture ID
   constant XLEN          : natural := 32; -- native data path width
   constant int_bus_tmo_c : natural := 16; -- internal bus timeout window; has to be a power of two
@@ -37,7 +37,7 @@ package neorv32_package is
   ;
 
 -- **********************************************************************************************************
--- Processor Address Space Layout
+-- SoC Address Space Layout
 -- **********************************************************************************************************
 
   -- Main Address Regions (base address must be aligned to the region's size) ---
@@ -85,8 +85,8 @@ package neorv32_package is
   constant base_io_ocd_c     : std_ulogic_vector(31 downto 0) := x"ffff0000";
 
   -- On-Chip Debugger - debug module entry points (code ROM) --
-  constant dm_exc_entry_c  : std_ulogic_vector(31 downto 0) := x"fffffe00"; -- = base_io_ocd_c + code_rom_base + 0
-  constant dm_park_entry_c : std_ulogic_vector(31 downto 0) := x"fffffe04"; -- = base_io_ocd_c + code_rom_base + 4
+  constant dm_exc_entry_c  : std_ulogic_vector(31 downto 0) := x"ffffff00"; -- = base_io_ocd_c + code_rom_base + 0
+  constant dm_park_entry_c : std_ulogic_vector(31 downto 0) := x"ffffff04"; -- = base_io_ocd_c + code_rom_base + 4
 
 -- **********************************************************************************************************
 -- SoC Definitions
@@ -107,7 +107,7 @@ package neorv32_package is
   -- -------------------------------------------------------------------------------------------
   -- bus request --
   type bus_req_t is record
-    meta  : std_ulogic_vector(2 downto 0); -- access meta information
+    meta  : std_ulogic_vector(4 downto 0); -- access meta data: core_ID[2], debug[1], priv[1], load/store[1]
     addr  : std_ulogic_vector(31 downto 0); -- access address
     data  : std_ulogic_vector(31 downto 0); -- write data
     ben   : std_ulogic_vector(3 downto 0); -- byte enable
@@ -121,7 +121,7 @@ package neorv32_package is
     fence : std_ulogic; -- set if fence(.i) operation, single-shot
   end record;
 
-  -- bus source (request) termination --
+  -- bus request termination --
   constant req_terminate_c : bus_req_t := (
     meta  => (others => '0'),
     addr  => (others => '0'),
@@ -143,7 +143,7 @@ package neorv32_package is
     data : std_ulogic_vector(31 downto 0); -- read data, valid if ack = 1
   end record;
 
-  -- bus endpoint (response) termination --
+  -- bus response termination --
   constant rsp_terminate_c : bus_rsp_t := (
     ack  => '0',
     err  => '0',
@@ -159,7 +159,7 @@ package neorv32_package is
     data : std_ulogic_vector(31 downto 0);
   end record;
 
-  -- source (request) termination --
+  -- request termination --
   constant dmi_req_terminate_c : dmi_req_t := (
     op   => (others => '0'),
     addr => (others => '0'),
@@ -177,7 +177,7 @@ package neorv32_package is
     ack  : std_ulogic; -- single-shot
   end record;
 
-  -- endpoint (response) termination --
+  -- response termination --
   constant dmi_rsp_terminate_c : dmi_rsp_t := (
     data => (others => '0'),
     ack  => '0'
@@ -185,7 +185,7 @@ package neorv32_package is
 
   -- External Bus Interface (XBUS / Wishbone) -----------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  -- xbus request --
+  -- request --
   type xbus_req_t is record
     addr : std_ulogic_vector(31 downto 0); -- access address
     data : std_ulogic_vector(31 downto 0); -- write data
@@ -197,7 +197,7 @@ package neorv32_package is
     cyc  : std_ulogic; -- valid cycle
   end record;
 
-  -- source (request) termination --
+  -- request termination --
   constant xbus_req_terminate_c : xbus_req_t := (
     addr => (others => '0'),
     data => (others => '0'),
@@ -209,14 +209,14 @@ package neorv32_package is
     cyc  => '0'
   );
 
-  -- xbus response --
+  -- response --
   type xbus_rsp_t is record
     data : std_ulogic_vector(31 downto 0); -- read data, valid if ack=1
     ack  : std_ulogic; -- access acknowledge
     err  : std_ulogic; -- access error
   end record;
 
-  -- endpoint (response) termination --
+  -- response termination --
   constant xbus_rsp_terminate_c : xbus_rsp_t := (
     data => (others => '0'),
     ack  => '0',
@@ -259,7 +259,7 @@ package neorv32_package is
     mem_wdata : std_ulogic_vector(31 downto 0); -- write data
   end record;
 
-  -- trace source termination --
+  -- trace port termination --
   constant trace_port_terminate_c : trace_port_t := (
     valid     => '0',
     order     => (others => '0'),
@@ -375,7 +375,7 @@ package neorv32_package is
   constant funct3_csrrw_c  : std_ulogic_vector(2 downto 0) := "001"; -- csr r/w
   constant funct3_csrrs_c  : std_ulogic_vector(2 downto 0) := "010"; -- csr read & set
   constant funct3_csrrc_c  : std_ulogic_vector(2 downto 0) := "011"; -- csr read & clear
-  constant funct3_csril_c  : std_ulogic_vector(2 downto 0) := "100"; -- undefined/illegal csr command
+  constant funct3_zimop_c  : std_ulogic_vector(2 downto 0) := "100"; -- may-be-operation
   constant funct3_csrrwi_c : std_ulogic_vector(2 downto 0) := "101"; -- csr r/w immediate
   constant funct3_csrrsi_c : std_ulogic_vector(2 downto 0) := "110"; -- csr read & set immediate
   constant funct3_csrrci_c : std_ulogic_vector(2 downto 0) := "111"; -- csr read & clear immediate
@@ -703,7 +703,7 @@ package neorv32_package is
   -- Trap ID Codes --------------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
   -- [MSB] 1 = interrupt, 0 = sync. exception; [MSB-1] 1 = entry to debug mode, 0 = normal trapping
-  -- RISC-V compliant synchronous exceptions --
+  -- RISC-V synchronous exceptions --
   constant trap_ima_c      : std_ulogic_vector(6 downto 0) := "0" & "0" & "00000"; -- 0: instruction misaligned
   constant trap_iaf_c      : std_ulogic_vector(6 downto 0) := "0" & "0" & "00001"; -- 1: instruction access fault
   constant trap_iil_c      : std_ulogic_vector(6 downto 0) := "0" & "0" & "00010"; -- 2: illegal instruction
@@ -713,11 +713,11 @@ package neorv32_package is
   constant trap_sma_c      : std_ulogic_vector(6 downto 0) := "0" & "0" & "00110"; -- 6: store address misaligned
   constant trap_saf_c      : std_ulogic_vector(6 downto 0) := "0" & "0" & "00111"; -- 7: store access fault
   constant trap_env_c      : std_ulogic_vector(6 downto 0) := "0" & "0" & "01000"; -- 8..11: environment call
-  -- RISC-V compliant asynchronous exceptions (interrupts) --
+  -- RISC-V asynchronous exceptions (interrupts) --
   constant trap_msi_c      : std_ulogic_vector(6 downto 0) := "1" & "0" & "00011"; -- 3:  machine software interrupt
   constant trap_mti_c      : std_ulogic_vector(6 downto 0) := "1" & "0" & "00111"; -- 7:  machine timer interrupt
   constant trap_mei_c      : std_ulogic_vector(6 downto 0) := "1" & "0" & "01011"; -- 11: machine external interrupt
-  -- NEORV32-specific (RISC-V custom) asynchronous exceptions (interrupts) --
+  -- NEORV32-specific asynchronous exceptions (interrupts) --
   constant trap_firq0_c    : std_ulogic_vector(6 downto 0) := "1" & "0" & "10000"; -- 16: fast interrupt 0
   constant trap_firq1_c    : std_ulogic_vector(6 downto 0) := "1" & "0" & "10001"; -- 17: fast interrupt 1
   constant trap_firq2_c    : std_ulogic_vector(6 downto 0) := "1" & "0" & "10010"; -- 18: fast interrupt 2
@@ -819,7 +819,7 @@ package neorv32_package is
   function bit_rev_f(input : std_ulogic_vector) return std_ulogic_vector;
   function is_power_of_two_f(input : natural) return boolean;
   function replicate_f(input : std_ulogic; num : natural) return std_ulogic_vector;
-  function print_hex_f(data : std_ulogic_vector) return string;
+  function to_hexstring_f(data : std_ulogic_vector) return string;
   function match_f(input : std_ulogic_vector; pattern : std_ulogic_vector) return boolean;
 
 -- **********************************************************************************************************
@@ -847,18 +847,19 @@ package neorv32_package is
       RISCV_ISA_U           : boolean                        := false;
       RISCV_ISA_Zaamo       : boolean                        := false;
       RISCV_ISA_Zalrsc      : boolean                        := false;
-      RISCV_ISA_Zcb         : boolean                        := false;
       RISCV_ISA_Zba         : boolean                        := false;
       RISCV_ISA_Zbb         : boolean                        := false;
       RISCV_ISA_Zbkb        : boolean                        := false;
       RISCV_ISA_Zbkc        : boolean                        := false;
       RISCV_ISA_Zbkx        : boolean                        := false;
       RISCV_ISA_Zbs         : boolean                        := false;
+      RISCV_ISA_Zcb         : boolean                        := false;
       RISCV_ISA_Zfinx       : boolean                        := false;
       RISCV_ISA_Zibi        : boolean                        := false;
       RISCV_ISA_Zicntr      : boolean                        := false;
       RISCV_ISA_Zicond      : boolean                        := false;
       RISCV_ISA_Zihpm       : boolean                        := false;
+      RISCV_ISA_Zimop       : boolean                        := false;
       RISCV_ISA_Zmmul       : boolean                        := false;
       RISCV_ISA_Zknd        : boolean                        := false;
       RISCV_ISA_Zkne        : boolean                        := false;
@@ -917,14 +918,14 @@ package neorv32_package is
       IO_TWD_EN             : boolean                        := false;
       IO_TWD_RX_FIFO        : natural range 1 to 2**15       := 1;
       IO_TWD_TX_FIFO        : natural range 1 to 2**15       := 1;
-      IO_PWM_NUM_CH         : natural range 0 to 16          := 0;
+      IO_PWM_NUM            : natural range 0 to 32          := 0;
       IO_WDT_EN             : boolean                        := false;
       IO_TRNG_EN            : boolean                        := false;
       IO_TRNG_FIFO          : natural range 1 to 2**15       := 1;
       IO_CFS_EN             : boolean                        := false;
       IO_NEOLED_EN          : boolean                        := false;
       IO_NEOLED_TX_FIFO     : natural range 1 to 2**15       := 1;
-      IO_GPTMR_EN           : boolean                        := false;
+      IO_GPTMR_NUM          : natural range 0 to 16          := 0;
       IO_ONEWIRE_EN         : boolean                        := false;
       IO_ONEWIRE_FIFO       : natural range 1 to 2**15       := 1;
       IO_DMA_EN             : boolean                        := false;
@@ -1009,8 +1010,8 @@ package neorv32_package is
       -- 1-Wire Interface (available if IO_ONEWIRE_EN = true) --
       onewire_i      : in  std_ulogic := 'H';
       onewire_o      : out std_ulogic;
-      -- PWM (available if IO_PWM_NUM_CH > 0) --
-      pwm_o          : out std_ulogic_vector(15 downto 0); -- pwm channels
+      -- PWM (available if IO_PWM_NUM > 0) --
+      pwm_o          : out std_ulogic_vector(31 downto 0); -- pwm channels
       -- Custom Functions Subsystem IO --
       cfs_in_i       : in  std_ulogic_vector(255 downto 0) := (others => 'L');
       cfs_out_o      : out std_ulogic_vector(255 downto 0);
@@ -1201,17 +1202,17 @@ package body neorv32_package is
     return tmp_v;
   end function replicate_f;
 
-  -- Print hex value as string --------------------------------------------------------------
+  -- Convert to hex string ------------------------------------------------------------------
   -- -------------------------------------------------------------------------------------------
-  function print_hex_f(data : std_ulogic_vector) return string is
-    variable nibb_v : natural := data'length/4;
-    variable res_v  : string(1 to nibb_v);
+  function to_hexstring_f(data : std_ulogic_vector) return string is
+    variable num_v : natural := data'length/4;
+    variable res_v : string(1 to num_v);
   begin
-    for i in 0 to nibb_v-1 loop
+    for i in 0 to num_v-1 loop
       res_v(i+1) := to_hexchar_f(data(data'high - i*4 downto data'high - i*4 - 3));
     end loop;
     return res_v;
-  end function print_hex_f;
+  end function to_hexstring_f;
 
   -- Check if vector matches binary pattern (skip elements compared with '-') ---------------
   -- -------------------------------------------------------------------------------------------

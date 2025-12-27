@@ -23,6 +23,8 @@ set_property -dict {PACKAGE_PIN A8 IOSTANDARD LVCMOS33} [get_ports {i_cmos_data1
 set_property -dict {PACKAGE_PIN F8 IOSTANDARD LVCMOS33} [get_ports {i_cmos_data1[1]}]
 set_property -dict {PACKAGE_PIN G14 IOSTANDARD LVCMOS33} [get_ports {i_cmos_data1[0]}]
 set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets i_cmos_pclk1_IBUF]
+set_property PULLUP TRUE [get_ports io_cmos_scl1]
+set_property PULLUP TRUE [get_ports io_cmos_sda1]
 # # ov5640-2
 set_property -dict {PACKAGE_PIN C14 IOSTANDARD LVCMOS33} [get_ports io_cmos_scl2]
 set_property -dict {PACKAGE_PIN B14 IOSTANDARD LVCMOS33} [get_ports io_cmos_sda2]
@@ -39,6 +41,8 @@ set_property -dict {PACKAGE_PIN D10 IOSTANDARD LVCMOS33} [get_ports {i_cmos_data
 set_property -dict {PACKAGE_PIN D9 IOSTANDARD LVCMOS33} [get_ports {i_cmos_data2[1]}]
 set_property -dict {PACKAGE_PIN B12 IOSTANDARD LVCMOS33} [get_ports {i_cmos_data2[0]}]
 set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets i_cmos_pclk2_IBUF]
+set_property PULLUP TRUE [get_ports io_cmos_scl2]
+set_property PULLUP TRUE [get_ports io_cmos_sda2]
 
 # hdmi-1
 # set_property -dict {PACKAGE_PIN AE22 IOSTANDARD LVCMOS33} [get_ports o_TMDS1_en]

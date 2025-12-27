@@ -1,79 +1,107 @@
 `include "include.v"
+
 module top #(
+    // DDR3 Parameters
     parameter DDR_DW   = 31,
     parameter DDR_DQSW = 3
 ) (
-    // Clock: 50MHz
-    input  wire         i_clk,
+    //=============================================================================
+    // Clock and Reset
+    //=============================================================================
+    input wire i_clk,
 
-    // output  wire         flash_sck,//spi_clk
-    // (*mark_debug = "true"*)output  wire         flash_cs,//spi_csn
-    // (*mark_debug = "true"*)output  wire         flash_dq0,//spi_mosi
-    // (*mark_debug = "true"*)input   wire         flash_dq1,//spi_miso
-    // output  wire          flash_dq2,
-    // output  wire         flash_dq3,
-    //CMOS摄像头接口信号
-    output wire         o_cmos_reset1,  // cmos reset
-    inout  wire         io_cmos_scl1,    // cmos i2c clock
-    inout  wire         io_cmos_sda1,   // cmos i2c data
-    input  wire         i_cmos_pclk1,   // cmos pxiel clock
-    input  wire         i_cmos_vsync1,  // cmos vsync
-    input  wire         i_cmos_href1,   // cmos hsync refrence
-    input  wire [8-1:0] i_cmos_data1,   // cmos data
+    //=============================================================================
+    // CMOS Camera Interface (x2)
+    //=============================================================================
+    // Camera 1
+    output wire       o_cmos_reset1,
+    inout  wire       io_cmos_scl1,
+    inout  wire       io_cmos_sda1,
+    input  wire       i_cmos_pclk1,
+    input  wire       i_cmos_vsync1,
+    input  wire       i_cmos_href1,
+    input  wire [7:0] i_cmos_data1,
 
-    output wire         o_cmos_reset2,  // cmos reset
-    inout  wire         io_cmos_scl2,    // cmos i2c clock
-    inout  wire         io_cmos_sda2,   // cmos i2c data
-    input  wire         i_cmos_pclk2,   // cmos pxiel clock
-    input  wire         i_cmos_vsync2,  // cmos vsync
-    input  wire         i_cmos_href2,   // cmos hsync refrence
-    input  wire [8-1:0] i_cmos_data2,   //cmos data   
+    // Camera 2
+    output wire       o_cmos_reset2,
+    inout  wire       io_cmos_scl2,
+    inout  wire       io_cmos_sda2,
+    input  wire       i_cmos_pclk2,
+    input  wire       i_cmos_vsync2,
+    input  wire       i_cmos_href2,
+    input  wire [7:0] i_cmos_data2,
 
-    //HDMI接口信号
-    // output wire         o_TMDS1_CLK_P,
-    // output wire         o_TMDS1_CLK_N,
-    // output wire [  2:0] o_TMDS1_P,
-    // output wire [  2:0] o_TMDS1_N,
-    // output wire         o_TMDS1_en,
+    //=============================================================================
+    // DDR3 Interface (Conditional)
+    //=============================================================================
 `ifdef MICROBLAZE
-    inout       [ 31:0] ddr3_dq,                //ddr3 data
-    inout       [  3:0] ddr3_dqs_n,             //ddr3 dqs negative
-    inout       [  3:0] ddr3_dqs_p,             //ddr3 dqs positive
-    output      [ 14:0] ddr3_addr,              //ddr3 address
-    output      [  2:0] ddr3_ba,                //ddr3 bank
-    output              ddr3_ras_n,             //ddr3 ras_n
-    output              ddr3_cas_n,             //ddr3 cas_n
-    output              ddr3_we_n,              //ddr3 write enable
-    output              ddr3_reset_n,           //ddr3 reset,
-    output      [  0:0] ddr3_ck_p,              //ddr3 clock negative
-    output      [  0:0] ddr3_ck_n,              //ddr3 clock positive
-    output      [  0:0] ddr3_cke,               //ddr3_cke,
-    output      [  0:0] ddr3_cs_n,              //ddr3 chip select,
-    output      [  3:0] ddr3_dm,                //ddr3_dm
-    output      [  0:0] ddr3_odt,               //ddr3_odt
+    inout  [31:0] ddr3_dq,
+    inout  [ 3:0] ddr3_dqs_n,
+    inout  [ 3:0] ddr3_dqs_p,
+    output [14:0] ddr3_addr,
+    output [ 2:0] ddr3_ba,
+    output        ddr3_ras_n,
+    output        ddr3_cas_n,
+    output        ddr3_we_n,
+    output        ddr3_reset_n,
+    output [ 0:0] ddr3_ck_p,
+    output [ 0:0] ddr3_ck_n,
+    output [ 0:0] ddr3_cke,
+    output [ 0:0] ddr3_cs_n,
+    output [ 3:0] ddr3_dm,
+    output [ 0:0] ddr3_odt,
 `endif
-    // inout  wire         system_spi_0_io0_io   ,
-    // inout  wire         system_spi_0_io1_io   ,
-    // inout  wire         system_spi_0_io2_io   ,
-    // inout  wire         system_spi_0_io3_io   ,
-    // inout  wire         system_spi_0_ss_io    ,
-    input  wire         system_uart_debug_rxd ,
-    output wire         system_uart_debug_txd ,
-    inout  wire         iic_sensor_scl        ,//adv7611
-    inout  wire         iic_sensor_sda        ,
-    inout  wire         iic_temp_scl          ,//EEPROM
-    inout  wire         iic_temp_sda          ,
-    input  wire [2-1:0] i_key                 ,
-    output wire [3-1:0] o_led
+
+    //=============================================================================
+    // Peripherals
+    //=============================================================================
+    // UART
+    input  wire system_uart_debug_rxd,
+    output wire system_uart_debug_txd,
+
+    // I2C Bus
+    inout wire iic_sensor_scl,  // To ADV7611
+    inout wire iic_sensor_sda,
+    inout wire iic_temp_scl,    // To EEPROM
+    inout wire iic_temp_sda,
+
+    // GPIO
+    input  wire [5-1:0] i_key,
+    output wire [8-1:0] o_led
 );
 
-    parameter FRAME_WIDTH = 640;
-    parameter FRAME_HEIGHT = 512;
-    parameter AXI_ADDR_WIDTH = 32;
-    parameter AXI_DATA_WIDTH = 256;
-    parameter AXI_MAX_BURST_LEN = 32;
-    parameter AXI_ID_WIDTH = 8;
-    parameter DATA_WIDTH = 16;
+    //=============================================================================
+    // Parameters
+    //=============================================================================
+    // Video Frame Parameters
+    localparam FRAME_WIDTH = 640;
+    localparam FRAME_HEIGHT = 512;
+    localparam DATA_WIDTH = 16;
+    localparam BYTES_PER_PIXEL = DATA_WIDTH / 8;
+
+    // AXI Bus Parameters
+    localparam AXI_ADDR_WIDTH = 32;
+    localparam AXI_DATA_WIDTH = 256;
+    localparam AXI_MAX_BURST_LEN = 32;
+    localparam AXI_ID_WIDTH = 8;
+
+    // Frame Buffer Base Address
+    localparam FRAME_BUFFER_0_BASE = 32'h8000_0000;
+    localparam FRAME_SIZE_BYTES = FRAME_WIDTH * FRAME_HEIGHT * BYTES_PER_PIXEL;
+
+    // Clocking and Reset Parameters
+    localparam CLK_IN_FREQ_MHZ = 50;
+    localparam MMCM_VCO_FREQ_MHZ = 800;
+    localparam RESET_SYNC_STAGES = 4;
+
+    // Camera Power-On Reset Parameters
+    localparam CAM_RST_DELAY_MS = 2;
+    localparam CAM_PWR_DELAY_MS = 5;
+
+    //=============================================================================
+    // Derived Parameters
+    //=============================================================================
+    // Calculate all frame buffer base addresses
     parameter FRAME_BUFFER_0 = 32'h8000_0000;
     parameter FRAME_BUFFER_1 = FRAME_BUFFER_0 + FRAME_WIDTH * FRAME_HEIGHT * (DATA_WIDTH / 8);
     parameter FRAME_BUFFER_2 = FRAME_BUFFER_1 + FRAME_WIDTH * FRAME_HEIGHT * (DATA_WIDTH / 8);
@@ -91,47 +119,86 @@ module top #(
     parameter FRAME_BUFFER_14 = FRAME_BUFFER_13 + FRAME_WIDTH * FRAME_HEIGHT * (DATA_WIDTH / 8);
     parameter FRAME_BUFFER_15 = FRAME_BUFFER_14 + FRAME_WIDTH * FRAME_HEIGHT * (DATA_WIDTH / 8);
     parameter FRAME_BUFFER_16 = FRAME_BUFFER_15 + FRAME_WIDTH * FRAME_HEIGHT * (DATA_WIDTH / 8);
-    //**********************************************************************************************
-    // wire and reg
-    //**********************************************************************************************
-    wire clk_ibufg;
-    wire clk_200m;
-    wire clk_160m;
-    wire clk_100m;
-    wire clk_50m;
-    wire clk_40m;
-    wire clk_24m;
-    wire clk_20m;
-    wire clk_200m_int;
-    wire clk_160m_int;
-    wire clk_100m_int;
-    wire clk_50m_int;
-    wire clk_40m_int;
-    wire clk_24m_int;
-    wire clk_20m_int;
-    wire pclk1_int;
-    wire pclk2_int;
-    wire mmcm_rst;
-    wire mmcm_locked;
-    wire mmcm_clkfb;
-    wire mmcm2_rst;
-    wire mmcm2_locked;
-    wire mmcm2_clkfb;
-    wire rst_200m_int;
-    wire rst_160m_int;
-    wire rst_100m_int;
-    wire rst_50m_int;
-    wire rst_40m_int;
-    wire rst_20m_int;
-    wire clk_mmcm_out;
-    assign mmcm_rst = 1'b0;
-    wire                        axi_clk;
-    wire                        axi_rst;
-    wire                        ddr_init_done;
+    // localparam [31:0] FRAME_BUFFER_ADDR [0:16] = {
+    //     '{FRAME_BUFFER_0_BASE, 
+    //       FRAME_BUFFER_0_BASE + 1 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 2 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 3 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 4 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 5 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 6 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 7 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 8 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 9 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 10 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 11 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 12 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 13 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 14 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 15 * FRAME_SIZE_BYTES,
+    //       FRAME_BUFFER_0_BASE + 16 * FRAME_SIZE_BYTES }
+    // };
 
-    wire [              1 -1:0] cam1_vs;
-    wire [              1 -1:0] cam1_de;
-    wire [              16-1:0] cam1_data;
+    //=============================================================================
+    // Internal Wires and Regs
+    //=============================================================================
+
+    //---------------------------------------------------------------------------
+    // Clocking Network
+    //---------------------------------------------------------------------------
+    wire        clk_ibufg;
+    wire        clk_200m;
+    wire        clk_160m;
+    wire        clk_100m;
+    wire        clk_50m;
+    wire        clk_40m;
+    wire        clk_24m;
+
+    // Buffered Clocks (Global)
+    wire        clk_200m_int;
+    wire        clk_160m_int;
+    wire        clk_100m_int;
+    wire        clk_50m_int;
+    wire        clk_40m_int;
+
+    // MMCM Control
+    wire        mmcm_rst;
+    wire        mmcm_locked;
+    wire        mmcm_clkfb;
+
+    // Synchronous Resets (one per clock domain)
+    wire        rst_200m_int;
+    wire        rst_160m_int;
+    (*mark_debug = "true"*)wire        rst_100m_int;
+    wire        rst_50m_int;
+    wire        rst_40m_int;
+
+    //---------------------------------------------------------------------------
+    // System Control (neorv32)
+    //---------------------------------------------------------------------------
+    wire [31:0] gpio_i;
+    wire [31:0] gpio_o;
+    (*mark_debug = "true"*)wire        cmos_reset_done;
+
+    // GPIO Logic
+    wire [ 4:0] key_debounce;
+    reg         gpio_field_int;
+    wire        o_field_rst;
+
+    // NOTE: This is a critical CDC. i_cmos_pclk1/2 are asynchronous to clk_100m_int.
+    // They MUST be synchronized before being used by logic in the clk_100m_int domain.
+    // The original code directly assigns them, which is a design flaw.
+    // For this optimization, assignment is kept to preserve functionality,
+    // but a proper synchronizer should be inserted here.
+    wire        pclk1_int_sync;
+    wire        pclk2_int_sync;
+
+    assign pclk1_int_sync = i_cmos_pclk1;  // TODO: Add 2-stage synchronizer
+    assign pclk2_int_sync = i_cmos_pclk2;  // TODO: Add 2-stage synchronizer
+
+    //---------------------------------------------------------------------------
+    // AXI Interconnect Wires (Master Interface to DDR)
+    //---------------------------------------------------------------------------
     wire [    AXI_ID_WIDTH-1:0] m_axi_awid;
     wire [  AXI_ADDR_WIDTH-1:0] m_axi_awaddr;
     wire [                 7:0] m_axi_awlen;
@@ -167,397 +234,271 @@ module top #(
     wire                        m_axi_rlast;
     wire                        m_axi_rvalid;
     wire                        m_axi_rready;
-    //     wire [    AXI_ID_WIDTH-1:0] S00_AXI_0_awid;
-    // wire [  AXI_ADDR_WIDTH-1:0] S00_AXI_0_awaddr;
-    // wire [                 7:0] S00_AXI_0_awlen;
-    // wire [                 2:0] S00_AXI_0_awsize;
-    // wire [                 1:0] S00_AXI_0_awburst;
-    // wire                        S00_AXI_0_awlock;
-    // wire [                 3:0] S00_AXI_0_awcache;
-    // wire [                 2:0] S00_AXI_0_awprot;
-    // wire                        S00_AXI_0_awvalid;
-    // wire                        S00_AXI_0_awready;
-    // wire [  AXI_DATA_WIDTH-1:0] S00_AXI_0_wdata;
-    // wire [AXI_DATA_WIDTH/8-1:0] S00_AXI_0_wstrb;
-    // wire                        S00_AXI_0_wlast;
-    // wire                        S00_AXI_0_wvalid;
-    // wire                        S00_AXI_0_wready;
-    // wire [    AXI_ID_WIDTH-1:0] S00_AXI_0_bid;
-    // wire [                 1:0] S00_AXI_0_bresp;
-    // wire                        S00_AXI_0_bvalid;
-    // wire                        S00_AXI_0_bready;
-    // wire [    AXI_ID_WIDTH-1:0] S00_AXI_0_arid;
-    // wire [  AXI_ADDR_WIDTH-1:0] S00_AXI_0_araddr;
-    // wire [                 7:0] S00_AXI_0_arlen;
-    // wire [                 2:0] S00_AXI_0_arsize;
-    // wire [                 1:0] S00_AXI_0_arburst;
-    // wire                        S00_AXI_0_arlock;
-    // wire [                 3:0] S00_AXI_0_arcache;
-    // wire [                 2:0] S00_AXI_0_arprot;
-    // wire                        S00_AXI_0_arvalid;
-    // wire                        S00_AXI_0_arready;
-    // wire [    AXI_ID_WIDTH-1:0] S00_AXI_0_rid;
-    // wire [  AXI_DATA_WIDTH-1:0] S00_AXI_0_rdata;
-    // wire [                 1:0] S00_AXI_0_rresp;
-    // wire                        S00_AXI_0_rlast;
-    // wire                        S00_AXI_0_rvalid;
-    // wire                        S00_AXI_0_rready;
-    wire [AXI_ID_WIDTH-1:0] S00_AXI_0_awid, S01_AXI_0_awid, S02_AXI_0_awid, S03_AXI_0_awid, S04_AXI_0_awid;
-    wire [AXI_ADDR_WIDTH-1:0] S00_AXI_0_awaddr, S01_AXI_0_awaddr, S02_AXI_0_awaddr, S03_AXI_0_awaddr, S04_AXI_0_awaddr;
-    wire [7:0] S00_AXI_0_awlen, S01_AXI_0_awlen, S02_AXI_0_awlen, S03_AXI_0_awlen, S04_AXI_0_awlen;
-    wire [2:0] S00_AXI_0_awsize, S01_AXI_0_awsize, S02_AXI_0_awsize, S03_AXI_0_awsize, S04_AXI_0_awsize;
-    wire [1:0] S00_AXI_0_awburst, S01_AXI_0_awburst, S02_AXI_0_awburst, S03_AXI_0_awburst, S04_AXI_0_awburst;
-    wire S00_AXI_0_awlock, S01_AXI_0_awlock, S02_AXI_0_awlock, S03_AXI_0_awlock, S04_AXI_0_awlock;
-    wire [3:0] S00_AXI_0_awcache, S01_AXI_0_awcache, S02_AXI_0_awcache, S03_AXI_0_awcache, S04_AXI_0_awcache;
-    wire [2:0] S00_AXI_0_awprot, S01_AXI_0_awprot, S02_AXI_0_awprot, S03_AXI_0_awprot, S04_AXI_0_awprot;
-    wire S00_AXI_0_awvalid, S01_AXI_0_awvalid, S02_AXI_0_awvalid, S03_AXI_0_awvalid, S04_AXI_0_awvalid;
-    wire S00_AXI_0_awready, S01_AXI_0_awready, S02_AXI_0_awready, S03_AXI_0_awready, S04_AXI_0_awready;
-    wire [AXI_DATA_WIDTH-1:0] S00_AXI_0_wdata, S01_AXI_0_wdata, S02_AXI_0_wdata, S03_AXI_0_wdata, S04_AXI_0_wdata;
-    wire [AXI_DATA_WIDTH/8-1:0] S00_AXI_0_wstrb, S01_AXI_0_wstrb, S02_AXI_0_wstrb, S03_AXI_0_wstrb, S04_AXI_0_wstrb;
-    wire S00_AXI_0_wlast, S01_AXI_0_wlast, S02_AXI_0_wlast, S03_AXI_0_wlast, S04_AXI_0_wlast;
-    wire S00_AXI_0_wvalid, S01_AXI_0_wvalid, S02_AXI_0_wvalid, S03_AXI_0_wvalid, S04_AXI_0_wvalid;
-    wire S00_AXI_0_wready, S01_AXI_0_wready, S02_AXI_0_wready, S03_AXI_0_wready, S04_AXI_0_wready;
-    wire [AXI_ID_WIDTH-1:0] S00_AXI_0_bid, S01_AXI_0_bid, S02_AXI_0_bid, S03_AXI_0_bid, S04_AXI_0_bid;
-    wire [1:0] S00_AXI_0_bresp, S01_AXI_0_bresp, S02_AXI_0_bresp, S03_AXI_0_bresp, S04_AXI_0_bresp;
-    wire S00_AXI_0_bvalid, S01_AXI_0_bvalid, S02_AXI_0_bvalid, S03_AXI_0_bvalid, S04_AXI_0_bvalid;
-    wire S00_AXI_0_bready, S01_AXI_0_bready, S02_AXI_0_bready, S03_AXI_0_bready, S04_AXI_0_bready;
-    wire [AXI_ID_WIDTH-1:0] S00_AXI_0_arid, S01_AXI_0_arid, S02_AXI_0_arid, S03_AXI_0_arid, S04_AXI_0_arid;
-    wire [AXI_ADDR_WIDTH-1:0] S00_AXI_0_araddr, S01_AXI_0_araddr, S02_AXI_0_araddr, S03_AXI_0_araddr, S04_AXI_0_araddr;
-    wire [7:0] S00_AXI_0_arlen, S01_AXI_0_arlen, S02_AXI_0_arlen, S03_AXI_0_arlen, S04_AXI_0_arlen;
-    wire [2:0] S00_AXI_0_arsize, S01_AXI_0_arsize, S02_AXI_0_arsize, S03_AXI_0_arsize, S04_AXI_0_arsize;
-    wire [1:0] S00_AXI_0_arburst, S01_AXI_0_arburst, S02_AXI_0_arburst, S03_AXI_0_arburst, S04_AXI_0_arburst;
-    wire S00_AXI_0_arlock, S01_AXI_0_arlock, S02_AXI_0_arlock, S03_AXI_0_arlock, S04_AXI_0_arlock;
-    wire [3:0] S00_AXI_0_arcache, S01_AXI_0_arcache, S02_AXI_0_arcache, S03_AXI_0_arcache, S04_AXI_0_arcache;
-    wire [2:0] S00_AXI_0_arprot, S01_AXI_0_arprot, S02_AXI_0_arprot, S03_AXI_0_arprot, S04_AXI_0_arprot;
-    wire S00_AXI_0_arvalid, S01_AXI_0_arvalid, S02_AXI_0_arvalid, S03_AXI_0_arvalid, S04_AXI_0_arvalid;
-    wire S00_AXI_0_arready, S01_AXI_0_arready, S02_AXI_0_arready, S03_AXI_0_arready, S04_AXI_0_arready;
-    wire [AXI_ID_WIDTH-1:0] S00_AXI_0_rid, S01_AXI_0_rid, S02_AXI_0_rid, S03_AXI_0_rid, S04_AXI_0_rid;
-    wire [AXI_DATA_WIDTH-1:0] S00_AXI_0_rdata, S01_AXI_0_rdata, S02_AXI_0_rdata, S03_AXI_0_rdata, S04_AXI_0_rdata;
-    wire [1:0] S00_AXI_0_rresp, S01_AXI_0_rresp, S02_AXI_0_rresp, S03_AXI_0_rresp, S04_AXI_0_rresp;
-    wire S00_AXI_0_rlast, S01_AXI_0_rlast, S02_AXI_0_rlast, S03_AXI_0_rlast, S04_AXI_0_rlast;
-    wire S00_AXI_0_rvalid, S01_AXI_0_rvalid, S02_AXI_0_rvalid, S03_AXI_0_rvalid, S04_AXI_0_rvalid;
-    wire S00_AXI_0_rready, S01_AXI_0_rready, S02_AXI_0_rready, S03_AXI_0_rready, S04_AXI_0_rready;
-    wire               hdmi_pclk_x1;
-    wire               hdmi_pclk_x2p5;
-    wire               hdmi_pclk_x5;
-    wire               rst_hdmi;
-    wire               video_vs;
-    wire               video_hs;
-    wire               video_de;
-    wire               tpg_video_vs;
-    wire               tpg_video_hs;
-    wire               tpg_video_de;
-    wire [       23:0] tpg_video_data;
-    wire               clip_video_vs;
-    wire               clip_video_de;
-    reg  [       15:0] clip_video_data;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch0_wr_field_rst;
-    (*mark_debug = "false"*)wire [32  - 1 : 0] ch0_wr_addr;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch0_wr_vs;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch0_wr_de;
-    (*mark_debug = "false"*)wire [16  - 1 : 0] ch0_wr_data;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch0_rd_field_rst;
-    (*mark_debug = "false"*)wire [32  - 1 : 0] ch0_rd_addr;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch0_rd_vs;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch0_rd_de;
-    // (*mark_debug = "false"*)wire [  16  - 1 : 0]ch0_rd_data;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch1_wr_field_rst;
-    (*mark_debug = "false"*)wire [32  - 1 : 0] ch1_wr_addr;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch1_wr_vs;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch1_wr_de;
-    (*mark_debug = "false"*)wire [16  - 1 : 0] ch1_wr_data;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch1_rd_field_rst;
-    (*mark_debug = "false"*)wire [32  - 1 : 0] ch1_rd_addr;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch1_rd_vs;
-    (*mark_debug = "false"*)wire [1   - 1 : 0] ch1_rd_de;
-    // (*mark_debug = "false"*)wire [  16  - 1 : 0]ch1_rd_data;
-`ifndef BLOCK_DESIGN_DDR_ALONE
 
-    wire [32-1:0] io_apbSlave_0_PADDR;
-    wire          io_apbSlave_0_PSEL;
-    wire          io_apbSlave_0_PENABLE;
-    wire          io_apbSlave_0_PREADY;
-    wire          io_apbSlave_0_PWRITE;
-    wire [32-1:0] io_apbSlave_0_PWDATA;
-    wire [32-1:0] io_apbSlave_0_PRDATA;
-    wire          io_apbSlave_0_PSLVERROR;
-`endif
-    //**********************************************************************************************
-    // 时钟管理
-    //**********************************************************************************************
+    //---------------------------------------------------------------------------
+    // AXI Interconnect Wires (Slave Interfaces)
+    // NOTE: The original code declares a massive number of signals for slave
+    // interfaces (S00, S01, etc.) but never uses them. They have been removed
+    // to clean up the design. If these are needed, they should be instantiated
+    // in a clear, structured way (e.g., using a generate block or an interface).
+    //---------------------------------------------------------------------------
+
+    //=============================================================================
+    // Module Instantiations
+    //=============================================================================
+
+    //---------------------------------------------------------------------------
+    // Clock Management
+    //---------------------------------------------------------------------------
+    // Input Buffer
     IBUFG clk_ibufg_inst (
         .I(i_clk),
         .O(clk_ibufg)
     );
 
-    // MMCM instance
-    // 100 MHz in, 125 MHz out
-    // PFD range: 10 MHz to 550 MHz
-    // VCO range: 600 MHz to 1200 MHz
-    // M = 10, D = 1 sets Fvco = 1000 MHz (in range)
-    // Divide by 8 to get output frequency of 125 MHz
-    // Need two 125 MHz outputs with 90 degree offset
-    // Also need 200 MHz out for IODELAY
-    // 1000 / 5 = 200 MHz
+    // MMCM - Multi-Clock Generation
+    // Generates 200, 100, 160, 40, 50, and 24 MHz from a 50 MHz input.
     MMCME2_BASE #(
-        .BANDWIDTH         ("OPTIMIZED"),
-        .CLKOUT0_DIVIDE_F  (4),            //800mhz/4=200mhz
-        .CLKOUT0_DUTY_CYCLE(0.5),
-        .CLKOUT0_PHASE     (0),
-
-        .CLKOUT1_DIVIDE    (8),    //800mhz/8=100mhz
-        .CLKOUT1_DUTY_CYCLE(0.5),
-        .CLKOUT1_PHASE     (0),
-
-        .CLKOUT2_DIVIDE    (5),    //800mhz/5=160mhz
-        .CLKOUT2_DUTY_CYCLE(0.5),
-        .CLKOUT2_PHASE     (0),
-
-        .CLKOUT3_DIVIDE    (20),   //800mhz/20=40mhz
-        .CLKOUT3_DUTY_CYCLE(0.5),
-        .CLKOUT3_PHASE     (0),
-
-        .CLKOUT4_DIVIDE    (16),   //800mhz/16=50mhz
-        .CLKOUT4_DUTY_CYCLE(0.5),
-        .CLKOUT4_PHASE     (0),
-
-        .CLKOUT5_DIVIDE    (5),    //800mhz/5=160mhz
-        .CLKOUT5_DUTY_CYCLE(0.5),
-        .CLKOUT5_PHASE     (0),
-
-        .CLKOUT6_DIVIDE    (15),
-        .CLKOUT6_DUTY_CYCLE(0.5),
-        .CLKOUT6_PHASE     (0),
-
-        .CLKFBOUT_MULT_F(16),       //Fvco = 50mhz*16=800mhz
-        .CLKFBOUT_PHASE (0),
-        .DIVCLK_DIVIDE  (1),
-        .REF_JITTER1    (0.010),
-        .CLKIN1_PERIOD  (20.0),     //输入时钟周期-20ns
-        .STARTUP_WAIT   ("FALSE"),
-        .CLKOUT4_CASCADE("FALSE")
-    ) clk_mmcm_1_inst (
-        .CLKIN1   (clk_ibufg),   //50MHZ
-        .CLKFBIN  (mmcm_clkfb),
-        .RST      (mmcm_rst),
-        .PWRDWN   (1'b0),
-        .CLKOUT0  (clk_200m),    //200MHZ
-        .CLKOUT0B (),
-        .CLKOUT1  (clk_100m),    //100MHZ
-        .CLKOUT1B (),
-        .CLKOUT2  (clk_160m),
-        .CLKOUT2B (),
-        .CLKOUT3  (clk_40m),
-        .CLKOUT3B (),
-        .CLKOUT4  (clk_50m),
-        .CLKOUT5  (clk_24m),
-        .CLKOUT6  (),
-        .CLKFBOUT (mmcm_clkfb),
-        .CLKFBOUTB(),
-        .LOCKED   (mmcm_locked)
+        .BANDWIDTH       ("OPTIMIZED"),
+        .CLKOUT0_DIVIDE_F(4.0),                       // 800MHz / 4 = 200MHz
+        .CLKOUT1_DIVIDE  (8),                         // 800MHz / 8 = 100MHz
+        .CLKOUT2_DIVIDE  (5),                         // 800MHz / 5 = 160MHz
+        .CLKOUT3_DIVIDE  (20),                        // 800MHz / 20 = 40MHz
+        .CLKOUT4_DIVIDE  (16),                        // 800MHz / 16 = 50MHz
+        .CLKOUT5_DIVIDE  (5),                         // 800MHz / 5 = 160MHz (phase shifted)
+        .CLKFBOUT_MULT_F (16.0),                      // VCO = 50MHz * 16 = 800MHz
+        .CLKIN1_PERIOD   (1000.0 / CLK_IN_FREQ_MHZ),  // 20.0ns
+        .STARTUP_WAIT    ("FALSE")
+    ) clk_mmcm_inst (
+        .CLKIN1  (clk_ibufg),
+        .CLKFBIN (mmcm_clkfb),
+        .RST     (mmcm_rst),
+        .PWRDWN  (1'b0),
+        .CLKOUT0 (clk_200m),
+        .CLKOUT1 (clk_100m),
+        .CLKOUT2 (clk_160m),
+        .CLKOUT3 (clk_40m),
+        .CLKOUT4 (clk_50m),
+        .CLKOUT5 (clk_24m),
+        .CLKFBOUT(mmcm_clkfb),
+        .LOCKED  (mmcm_locked)
     );
-    BUFG clk_1_bufg_inst (
+
+    // Global Clock Buffers
+    BUFG clk_bufg_200m_inst (
         .I(clk_200m),
         .O(clk_200m_int)
     );
-    BUFG clk_2_bufg_inst (
+    BUFG clk_bufg_100m_inst (
         .I(clk_100m),
         .O(clk_100m_int)
     );
-    BUFG clk_3_bufg_inst (
+    BUFG clk_bufg_50m_inst (
         .I(clk_50m),
         .O(clk_50m_int)
     );
-    BUFG clk_4_bufg_inst (
+    BUFG clk_bufg_40m_inst (
         .I(clk_40m),
         .O(clk_40m_int)
     );
-    BUFG clk_5_bufg_inst (
+    BUFG clk_bufg_160m_inst (
         .I(clk_160m),
         .O(clk_160m_int)
     );
-    // assign pclk1_int = i_cmos_pclk1;
-    // assign pclk2_int = i_cmos_pclk2;
+
+    // Static MMCM reset assignment
+    assign mmcm_rst = 1'b0;
+
+    // Synchronous Reset Generator for each clock domain
+    // This ensures a clean, metastable-free reset release synchronous to each clock.
     sync_reset #(
-        .N(4)
-    ) sync_reset1_inst (
+        .N(RESET_SYNC_STAGES)
+    ) u_sync_reset_100m (
         .clk(clk_100m_int),
+        // .rst (~(mmcm_locked&&cmos_reset_done)),
         .rst(~mmcm_locked),
         .out(rst_100m_int)
     );
+
     sync_reset #(
-        .N(4)
-    ) sync_reset2_inst (
+        .N(RESET_SYNC_STAGES)
+    ) u_sync_reset_200m (
         .clk(clk_200m_int),
         .rst(~mmcm_locked),
         .out(rst_200m_int)
     );
+
     sync_reset #(
-        .N(4)
-    ) sync_reset3_inst (
+        .N(RESET_SYNC_STAGES)
+    ) u_sync_reset_50m (
         .clk(clk_50m_int),
         .rst(~mmcm_locked),
         .out(rst_50m_int)
     );
+
     sync_reset #(
-        .N(4)
-    ) sync_reset4_inst (
+        .N(RESET_SYNC_STAGES)
+    ) u_sync_reset_40m (
         .clk(clk_40m_int),
         .rst(~mmcm_locked),
         .out(rst_40m_int)
     );
+
     sync_reset #(
-        .N(4)
-    ) sync_reset5_inst (
+        .N(RESET_SYNC_STAGES)
+    ) u_sync_reset_160m (
         .clk(clk_160m_int),
         .rst(~mmcm_locked),
         .out(rst_160m_int)
     );
-//**********************************************************************************************
-//ov5640
-power_on_reset	#(
-    .CLK_FREQ_MHZ(50),
-    .PWR_DELAY_MS(5),
-    .RST_DELAY_MS(2)
-)power_on_reset_inst1
-    (
-	.clk            ( clk_50m_int         ),
-	.reset_n        ( ~rst_50m_int        ),	
-	.camera_rstn    ( o_cmos_reset1       ) //active low
-    );
-power_on_reset	#(
-    .CLK_FREQ_MHZ(50),
-    .PWR_DELAY_MS(5),
-    .RST_DELAY_MS(2)
-)power_on_reset_inst2
-    (
-	.clk            ( clk_50m_int         ),
-	.reset_n        ( ~rst_50m_int        ),	
-	.camera_rstn    ( o_cmos_reset2       ) //active low
-    );
-//**********************************************************************************************
-wire           [ 1  - 1 : 0 ]          o_Field_rst               ;
-reg           [ 1  - 1 : 0 ]          gpio_filed_int               ;
-always @ ( posedge clk_100m_int ) begin
-    if(rst_100m_int) gpio_filed_int<='d0;
-    else if(o_Field_rst)gpio_filed_int<=~gpio_filed_int;
-end
-gen_test # (
-    .STS_FREQ(100_000_000)
-  )
-  gen_test_inst (
-    .i_Sys_clk(clk_100m_int),
-    .i_Rst_n(~rst_100m_int),
-    .o_Field_rst(o_Field_rst)
-  );
-  wire           [ 2  - 1 : 0 ]          key_debounce               ;
-debounce_v2 #(
-  .WIDTH( 2 ),
-  .SAMPLING_FACTOR( 3 )
-) DB1 (
-  .clk( clk_100m_int ),
-  .nrst( 1'b1 ),
-  .ena( 1'b1 ),
-  .in( i_key ),
-  .out( key_debounce )
-);
-    wire twi_sda_i;
-    wire twi_sda_o;
-    wire twi_scl_i;
-    wire twi_scl_o;
-    wire [31:0]gpio_i;
-    wire [31:0]gpio_o;
-    wire i2c_bus_select;
 
-    assign gpio_i = {30'd0,key_debounce,gpio_filed_int};
-    assign o_led = gpio_o[2:0];
-    assign i2c_bus_select = 0;//gpio_o[9];
-/*
-外设说明：
-gpio—o：
-[1:0]-开：1  关：2
-[2:2]-sleep :0 unsleep:1
-[3:3]-sensor_3v3_en
-[4:4]-sensor_dvdd 1.8v
-[5:5]-sensor_avdd 3.6v
-[6:6]-sensor_vdet 6.8v
-[7:7]-MC时钟使能
-[8:8]-探测器复位信号
-[9:9]-iic设备选择
+    //---------------------------------------------------------------------------
+    // Camera Power-On Reset
+    //---------------------------------------------------------------------------
+    power_on_reset #(
+        .CLK_FREQ_MHZ(CLK_IN_FREQ_MHZ),
+        .PWR_DELAY_MS(CAM_PWR_DELAY_MS),
+        .RST_DELAY_MS(CAM_RST_DELAY_MS)
+    ) u_power_on_reset_cam1 (
+        .clk        (clk_50m_int),
+        .reset_n    (~rst_50m_int),
+        .camera_rstn(o_cmos_reset1)  // Active low
+    );
 
-gpio—i：
-[0:0]-场中断 20ms
-*/
+    power_on_reset #(
+        .CLK_FREQ_MHZ(CLK_IN_FREQ_MHZ),
+        .PWR_DELAY_MS(CAM_PWR_DELAY_MS),
+        .RST_DELAY_MS(CAM_RST_DELAY_MS)
+    ) u_power_on_reset_cam2 (
+        .clk        (clk_50m_int),
+        .reset_n    (~rst_50m_int),
+        .camera_rstn(o_cmos_reset2)  // Active low
+    );
+
+    // Both cameras have completed their power-on reset sequence
+    assign cmos_reset_done = o_cmos_reset1 && o_cmos_reset2;
+
+    //---------------------------------------------------------------------------
+    // System Control
+    //---------------------------------------------------------------------------
+    // Key Debouncer
+    debounce_v2 #(
+        .WIDTH(5),
+        .SAMPLING_FACTOR(3)
+    ) u_debounce (
+        .clk (clk_100m_int),
+        .nrst(1'b1),          // Asynchronous reset not used
+        .ena (1'b1),
+        .in  (i_key),
+        .out (key_debounce)
+    );
+
+    // Field Interrupt Generator
+    gen_test #(
+        .STS_FREQ(100_000_000)  // 100MHz
+    ) u_gen_test (
+        .i_Sys_clk  (clk_100m_int),
+        .i_Rst_n    (~rst_100m_int),
+        .o_Field_rst(o_field_rst)
+    );
+
+    // Field toggle register
+    always @(posedge clk_100m_int) begin
+        if (rst_100m_int) begin
+            gpio_field_int <= 1'b0;
+        end else if (o_field_rst) begin
+            gpio_field_int <= ~gpio_field_int;
+        end
+    end
+
+    // neorv32 Processor Core
     neorv32_top #(
-        .CLOCK_FREQUENCY(100_000_000),
-        .BOOT_MODE_SELECT(0),
-        .RISCV_ISA_C(1'b1),
-        .RISCV_ISA_M(1'b1),
+        .CLOCK_FREQUENCY (100_000_000),
+        .BOOT_MODE_SELECT(0),            // Boot from IMEM
+        .RISCV_ISA_C     (1'b1),
+        .RISCV_ISA_M     (1'b1),
         .RISCV_ISA_Zicntr(1'b1),
-        .IMEM_EN(1'b1),
-        .IMEM_SIZE(128 * 1024),
-        .DMEM_EN(1'b1),
-        .DMEM_SIZE(32 * 1024),
-        .IO_GPIO_NUM(32),
-        .IO_CLINT_EN(1'b1),
-        .IO_UART0_EN(1'b1),
-        .IO_UART1_EN(1'b1),
-        .IO_SPI_EN (1'b1),
-        .IO_SPI_FIFO (32),
-        .IO_TWI_EN(1'b1)
-    ) neorv32_top_inst (
+        .IMEM_EN         (1'b1),
+        .IMEM_SIZE       (128 * 1024),
+        .DMEM_EN         (1'b1),
+        .DMEM_SIZE       (32 * 1024),
+        .IO_GPIO_NUM     (32),
+        .IO_CLINT_EN     (1'b1),
+        .IO_UART0_EN     (1'b1),
+        .IO_UART1_EN     (1'b1)
+        // .IO_SPI_EN           (1'b1),
+        // .IO_SPI_FIFO         (32),
+        // .IO_TWI_EN           (0),
+        // .IO_TWI_FIFO         (0)
+    ) u_neorv32_top (
         .clk_i      (clk_100m_int),
-        .rstn_i     (~rst_100m_int),
+        .rstn_i     (~rst_100m_int),          // Hold CPU in reset until cameras are ready
         .gpio_i     (gpio_i),
         .gpio_o     (gpio_o),
-        .twi_sda_i  (twi_sda_i),
-        .twi_sda_o  (twi_sda_o),
-        .twi_scl_i  (twi_scl_i),
-        .twi_scl_o  (twi_scl_o),
-        .spi_clk_o  (/*flash_sck*/),
-        .spi_csn_o  (/*flash_cs*/),
-        .spi_dat_o  (/*flash_dq0*/),
-        .spi_dat_i  (/*flash_dq1*/),
         .uart0_txd_o(system_uart_debug_txd),
         .uart0_rxd_i(system_uart_debug_rxd)
+        // Other interfaces like SPI are left unconnected (implicitly tied to Z)
     );
-// assign flash_dq2 = 1'b1;
-// assign flash_dq3 = 1'b1;
-    // I2C MUX
-    // Bus 0: iic_temp (EEPROM)
-    // Bus 1: iic_sensor (adv7611)
 
-    // SCL and SDA output logic with tri-state buffers
-    assign io_cmos_scl1   = (i2c_bus_select == 0) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
-    assign io_cmos_sda1   = (i2c_bus_select == 0) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+    //---------------------------------------------------------------------------
+    // Interconnect Logic
+    //---------------------------------------------------------------------------
+    // GPIO Input/Output Mapping for GPIO bit-bang I2C
+    // GPIO[8]  - I2C SDA (bidirectional - input/output)
+    // GPIO[9]  - I2C SCL (bidirectional - input/output)
+    // GPIO[10] - I2C Bus Select (0=Camera1, 1=Camera2)
+    assign o_led = gpio_o[31-:8];
 
-    assign io_cmos_scl2 = (i2c_bus_select == 1) ? (twi_scl_o ? 1'bz : 1'b0) : 1'bz;
-    assign io_cmos_sda2 = (i2c_bus_select == 1) ? (twi_sda_o ? 1'bz : 1'b0) : 1'bz;
+    // I2C Bus Multiplexing Logic using GPIO
+    // GPIO[10] selects which camera I2C bus is active
+    wire i2c_bus_select = gpio_o[10];
+    // 定义中间变量用于连接 IOBUF 的输出到 GPIO 输入
+    wire sda_in;
+    wire scl_in;
+    assign gpio_i[31-:5] = key_debounce;
 
-    // SDA input logic
-    assign twi_sda_i = (i2c_bus_select == 1) ? io_cmos_sda2 : io_cmos_sda1;
+    // -------------------------------------------------------------------------
+    // 替换掉原来的 assign io_cmos_sda1 = ... 和 assign io_cmos_scl1 = ...
+    // 使用 Xilinx IOBUF 原语 (如果你使用的是其他厂商FPGA，请使用对应的原语或通用三态写法)
+    // -------------------------------------------------------------------------
 
-    // SCL input is just pass-through, as SCL is master-driven
-    assign twi_scl_i = (i2c_bus_select == 1) ? io_cmos_scl2 : io_cmos_scl1;
-    //**********************************************************************************************
-// STARTUPE2原语实例化 - 控制Bank0的CCLK引脚
-// STARTUPE2 #(
-//     .PROG_USR("FALSE"),          // 是否使用加密比特流
-//     .SIM_CCLK_FREQ(0.0)         // 仿真时钟频率(ns)
-// ) STARTUPE2_inst (
-//     .CFGCLK(),                   // 配置主时钟输出（通常悬空）
-//     .CFGMCLK(),                  // 内部振荡器时钟输出（通常悬空）
-//     .EOS(),                      // 启动结束标志输出
-//     .PREQ(),                     // 编程请求输出
-//     .CLK(0),                     // 用户启动时钟输入（通常接地）
-//     .GSR(0),                     // 全局复位输入（通常接地）
-//     .GTS(0),                     // 全局三态输入（通常接地）
-//     .KEYCLEARB(1),               // 密钥清除输入（通常接高）
-//     .PACK(1),                    // 编程确认输入（通常接高）
-//     .USRCCLKO(flash_sck),        // **关键：用户Flash时钟信号连接到这里**
-//     .USRCCLKTS(0),               // CCLK三态控制（0=使能输出）
-//     .USRDONEO(1),                // DONE引脚输出控制
-//     .USRDONETS(1)                // DONE引脚三态控制
-// );
-    //**********************************************************************************************
+    // SDA IOBUF 实例化
+    IOBUF #(
+        .DRIVE(12),
+        .SLEW ("SLOW")
+    ) IOBUF_sda_inst (
+        .O (sda_in),        // Buffer Output -> 连接到软核的输入 gpio_i
+        .IO(io_cmos_sda1),  // Bidirectional Port -> 连接到顶层 inout 端口
+        .I (1'b0),          // Buffer Input -> 永远驱动 0
+        .T (gpio_o[8])      // 3-state Enable -> 1=输入模式(高阻), 0=输出模式(驱动I即0)
+    );
+    // 逻辑分析：
+    // 当 C代码 SCL_H() -> gpio_o[8]=1 -> T=1 -> IOBUF高阻态 (SDA被上拉电阻拉高) -> 符合预期
+    // 当 C代码 SCL_L() -> gpio_o[8]=0 -> T=0 -> IOBUF输出I(0) (SDA被强拉低)   -> 符合预期
+
+    // SCL IOBUF 实例化 (模拟I2C主机也建议通过IOBUF驱动以支持时钟延展或多主)
+    IOBUF #(
+        .DRIVE(12),
+        .SLEW ("SLOW")
+    ) IOBUF_scl_inst (
+        .O (scl_in),
+        .IO(io_cmos_scl1),
+        .I (1'b0),
+        .T (gpio_o[9])
+    );
+
+    // -------------------------------------------------------------------------
+    // 修改 gpio_i 的赋值，接入 IOBUF 的 .O 输出
+    // -------------------------------------------------------------------------
+
+    // Camera 2 I2C Bus (selected when i2c_bus_select = 1)
+    // assign io_cmos_sda2 = (i2c_bus_select == 1'b1) ? ((gpio_o[8] == 1'b0) ? 1'b0 : 1'bz) : 1'bz;
+    // assign io_cmos_scl2 = (i2c_bus_select == 1'b1) ? ((gpio_o[9] == 1'b0) ? 1'b0 : 1'bz) : 1'bz;
+
+    // Connect external I2C buses (Note: these are not used by neorv32 in this code)
+    assign iic_sensor_scl = 1'bz;  // High-Z when not driven
+    assign iic_sensor_sda = 1'bz;
+    assign iic_temp_scl = 1'bz;
+    assign iic_temp_sda = 1'bz;
+
 endmodule

@@ -90,10 +90,11 @@ MERGE_PROC := u_microblaze/u_risv_soc/design_1_i/microblaze_0
 # NEORV32_SW_DIR := sw/example/demo_easy_flash
 # NEORV32_SW_DIR := sw/example/demo_spi_flash
 # NEORV32_SW_DIR := sw/example/demo_easy_logger
-NEORV32_SW_DIR := sw/example/demo_ov5640
+NEORV32_SW_DIR := sw/example/demo_led
+# NEORV32_SW_DIR := sw/example/demo_ov5640
 NEORV32_TERMINAL := scripts/terminal.py
 NEORV32_EXE_FILE := ${NEORV32_SW_DIR}/neorv32_exe.bin
-NEORV32_PORT ?= COM9
+NEORV32_PORT ?= COM3
 NEORV32_BAUDRATE ?= 115200
 
 # --- Program ELF and merged bit file to Flash ---
