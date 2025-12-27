@@ -1,0 +1,32 @@
+{
+    "configurations": [
+        {
+            "name": "NEORV32 RISC-V",
+            "includePath": [
+                "${workspaceFolder}/sw/lib/include",
+                "${workspaceFolder}/sw/common"
+            ],
+            "defines": [
+                "NEORV32",
+                "__riscv",
+                "RV32I"
+            ],
+            "compilerPath": "riscv-none-elf-gcc",
+            "cStandard": "c99",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "ms-vscode.cpptools",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/sw/lib/include",
+                    "${workspaceFolder}/sw/common",
+                    "${workspaceFolder}/sw/example",
+                    "${workspaceFolder}/sw/app"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+        }
+    ],
+    "version": 4
+}

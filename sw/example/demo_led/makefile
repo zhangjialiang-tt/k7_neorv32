@@ -25,6 +25,7 @@ USER_FLAGS += -Wl,--defsym,__neorv32_ram_size=8k
 # Additional sources
 APP_SRC += main.c
 APP_SRC += led.c
+APP_SRC += key.c
 APP_INC += -I .
 
 # Set path to NEORV32 root directory
